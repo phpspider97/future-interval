@@ -99,7 +99,7 @@ function wsConnect() {
         } 
 
         if(message.type == "v2/ticker"){ 
-          console.log('Running spot price : ',Math.round(message?.spot_price))
+          //console.log('Running spot price : ',Math.round(message?.spot_price))
             if(current_running_order == '' && message?.spot_price>border_buy_price){
                 console.log('==================BUY ORDER==================',Math.round(message?.spot_price))
                 await cancelAllOpenOrder()

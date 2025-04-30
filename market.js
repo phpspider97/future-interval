@@ -83,7 +83,7 @@ function wsConnect() {
    
   async function onMessage(data) {
     const message = JSON.parse(data)
-    //console.log('message___',message)
+    console.log('message___',message)
     if (message.type === 'success' && message.message === 'Authenticated') {
       subscribe(ws, 'orders', ['all']);
       subscribe(ws, 'v2/ticker', ['BTCUSD']);
@@ -99,7 +99,7 @@ function wsConnect() {
         } 
 
         if(message.type == "v2/ticker"){ 
-          //console.log('Running spot price : ',Math.round(message?.spot_price))
+          console.log('Running spot price : ',Math.round(message?.spot_price))
             if(current_running_order == '' && message?.spot_price>border_buy_price){
                 console.log('==================BUY ORDER==================',Math.round(message?.spot_price))
                 await cancelAllOpenOrder()

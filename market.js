@@ -12,6 +12,7 @@ let current_profit = 0;
 let total_profit = 0;
 let border_price;
 let number_of_time_order_executed = 0;
+let lot_size_array = [1,3,9,21,42,76,132,219,352]
 
 let border_buy_price;
 let border_buy_profit_price;
@@ -83,7 +84,7 @@ function wsConnect() {
    
   async function onMessage(data) {
     const message = JSON.parse(data)
-    console.log('message___',message)
+    //console.log('message___',message)
     if (message.type === 'success' && message.message === 'Authenticated') {
       subscribe(ws, 'orders', ['all']);
       subscribe(ws, 'v2/ticker', ['BTCUSD']);
@@ -99,27 +100,41 @@ function wsConnect() {
         } 
 
         if(message.type == "v2/ticker"){ 
-          console.log('Running spot price : ',Math.round(message?.spot_price))
+            //console.log('Running spot price : ',Math.round(message?.spot_price))
+            //console.log('current_running_order____',current_running_order,message?.spot_price)
+            if(current_running_order == 'sell' && message?.spot_price>border_buy_price){
+                console.log('')
+                console.log('')
+                console.log('==================CLEAR SELL ORDER==================')
+                current_running_order = ''
+            }
             if(current_running_order == '' && message?.spot_price>border_buy_price){
-                console.log('==================BUY ORDER==================',Math.round(message?.spot_price))
+                console.log('')
+                console.log('')
+                console.log('==================BUY PROFIT BORDER==================',border_buy_profit_price)
+                console.log('==================BUY BORDER==================',border_buy_price)
+                console.log('==================BUY ORDER AT : ==================',Math.round(message?.spot_price))
                 await cancelAllOpenOrder()
                 current_running_order = 'buy'
                 await createOrder('buy')
             } 
             if(current_running_order == 'buy' && message?.spot_price<border_sell_price){
-                current_running_order == ''
+                console.log('')
+                console.log('')
+                console.log('==================CLEAR BUY ORDER==================')
+                current_running_order = ''
             }
             if(current_running_order == '' && message?.spot_price<border_sell_price){
-                console.log('==================SELL ORDER==================',Math.round(message?.spot_price))
+                console.log('')
+                console.log('')
+                console.log('==================SELL PROFIT BORDER==================',border_sell_profit_price)
+                console.log('==================SELL BORDER==================',border_sell_price)
+                console.log('==================SELL ORDER AT : ==================',Math.round(message?.spot_price))
                 await cancelAllOpenOrder()
                 current_running_order = 'sell' 
                 await createOrder('sell')
             }
-
-            if(current_running_order == 'sell' && message?.spot_price>border_buy_price){
-                current_running_order == ''
-            }
-             
+ 
             if (message?.spot_price > border_buy_profit_price || message?.spot_price < border_sell_profit_price) { 
                 console.log('RESER LOOP : ',message?.spot_price,border_buy_profit_price,border_sell_profit_price)
                 console.log('cancel_order_on_profit___')
@@ -137,6 +152,7 @@ function wsConnect() {
   }
   async function resetLoop(lot_size){
     current_lot = lot_size
+    number_of_time_order_executed = 0
     await init()
   }
   async function onClose(code, reason) {
@@ -239,7 +255,8 @@ async function createOrder(bidType,bitcoin_current_price) {
         const bodyParams = {
           product_id: bitcoin_product_id,
           product_symbol: "BTCUSD",
-          size: (current_lot == 5)?current_lot:current_lot+20,
+          size: lot_size_array[number_of_time_order_executed],
+          //size: (current_lot == 5)?current_lot:current_lot+20,
           side: bidType,   
           order_type: "market_order", 
         };
@@ -285,26 +302,31 @@ async function getCurrentPriceOfBitcoin() {
 }
 
 async function init() {
-  const result = await getCurrentPriceOfBitcoin();
-  if (!result.status) return;
-  //console.log('result___',result.data.result)
-  
-  const markPrice = Math.round(result.data.result.spot_price);
-  console.log('current_price___',markPrice)
-  bitcoin_product_id = result.data.result.product_id;
-  border_price = markPrice;
+    await cancelAllOpenOrder()
+    const result = await getCurrentPriceOfBitcoin();
+    if (!result.status) return;
+    //console.log('result___',result.data.result)
+    
+    const markPrice = Math.round(result.data.result.spot_price); 
+    bitcoin_product_id = result.data.result.product_id;
+    border_price = markPrice;
 
-  border_buy_price = markPrice + buy_sell_point;
-  border_buy_profit_price = border_buy_price + buy_sell_profit_point;
+    border_buy_price = markPrice + buy_sell_point;
+    border_buy_profit_price = border_buy_price + buy_sell_profit_point;
 
-  border_sell_price = markPrice - buy_sell_point;
-  border_sell_profit_price = border_sell_price - buy_sell_profit_point;
+    border_sell_price = markPrice - buy_sell_point;
+    border_sell_profit_price = border_sell_price - buy_sell_profit_point;
 
-  order_exicuted_at_price = 0 
-  total_error_count = 0 
-  isBracketOrderExist = false
- 
-  emitter.emit('log', { type: "init", markPrice });
+    order_exicuted_at_price = 0 
+    total_error_count = 0 
+    isBracketOrderExist = false
+    
+    emitter.emit('log', { type: "init", markPrice });
+    console.log('==================BUY PROFIT BORDER==================',border_buy_profit_price)
+    console.log('==================BUY BORDER==================',border_buy_price)
+    console.log('==================CURRENT PRICE==================',markPrice)
+    console.log('==================SELL BORDER==================',border_sell_price)
+    console.log('==================SELL PROFIT BORDER==================',border_sell_profit_price)
 }
 
 async function triggerOrder(current_price,openPosition) {

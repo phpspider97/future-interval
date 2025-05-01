@@ -12,7 +12,7 @@ let current_profit = 0;
 let total_profit = 0;
 let border_price;
 let number_of_time_order_executed = 0;
-let lot_size_array = [1,3,9,21,42,76,132,219,352]
+let lot_size_array = [5, 13, 32, 80, 200, 500, 1250, 3125, 7813, 19533]
 
 let border_buy_price;
 let border_buy_profit_price;

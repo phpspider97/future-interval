@@ -12,7 +12,7 @@ let current_profit = 0;
 let total_profit = 0;
 let border_price;
 let number_of_time_order_executed = 0;
-let lot_size_array = [5, 12, 31, 78, 195]
+let lot_size_array = [12, 31, 78, 195]
 
 let border_buy_price;
 let border_buy_profit_price;
@@ -21,8 +21,8 @@ let border_sell_price;
 let border_sell_profit_price;
    
 let botRunning = true;
-let buy_sell_profit_point = 300
-let buy_sell_point = 100
+let buy_sell_profit_point = 800
+let buy_sell_point = 400
 let cancel_gap = 200
 let lot_size_increase = 2
 let total_error_count = 0
@@ -115,10 +115,8 @@ function wsConnect() {
                 console.log('==================BUY BORDER==================',border_buy_price)
                 console.log('==================BUY ORDER AT : ==================',Math.round(message?.spot_price))
                 await cancelAllOpenOrder()
-                current_running_order = 'buy'
-                if (number_of_time_order_executed <= 3) {
-                    await createOrder('buy')
-                }
+                current_running_order = 'buy' 
+                await createOrder('buy')
             } 
             if(current_running_order == 'buy' && message?.spot_price<border_sell_price){
                 console.log('')
@@ -133,10 +131,9 @@ function wsConnect() {
                 console.log('==================SELL BORDER==================',border_sell_price)
                 console.log('==================SELL ORDER AT : ==================',Math.round(message?.spot_price))
                 await cancelAllOpenOrder()
-                current_running_order = 'sell' 
-                if (number_of_time_order_executed <= 3) {
-                    await createOrder('sell')
-                }
+                current_running_order = 'sell'  
+                await createOrder('sell')
+                
             }
  
             if (message?.spot_price > border_buy_profit_price || message?.spot_price < border_sell_profit_price) { 
@@ -248,18 +245,18 @@ async function cancelAllOpenOrder() {
 }
 
 async function createOrder(bidType,bitcoin_current_price) {
-    number_of_time_order_executed++; 
-    if (number_of_time_order_executed > 3) { 
-        console.log('Reached maximum allowed orders. Pausing bot for 30 minutes...');
-        orderInProgress = true; // block further orders
-        if(number_of_time_order_executed == 4){
-            setTimeout(async () => {
-            console.log('30 minutes over. Restarting bot...');
-            await init(); // resets lot size and order count
-            }, 30 * 60 * 1000); // 30 minutes in milliseconds
-        }
-        return { message: "Max orders executed, waiting for reset.", status: false };
-      }
+    // number_of_time_order_executed++; 
+    // if (number_of_time_order_executed > 3) { 
+    //     console.log('Reached maximum allowed orders. Pausing bot for 30 minutes...');
+    //     orderInProgress = true; // block further orders
+    //     if(number_of_time_order_executed == 4){
+    //         setTimeout(async () => {
+    //         console.log('30 minutes over. Restarting bot...');
+    //         await init(); // resets lot size and order count
+    //         }, 30 * 60 * 1000); // 30 minutes in milliseconds
+    //     }
+    //     return { message: "Max orders executed, waiting for reset.", status: false };
+    //   }
       if(total_error_count>5){
         return true
       }
@@ -291,6 +288,7 @@ async function createOrder(bidType,bitcoin_current_price) {
          
         if (response.data.success) {
           current_lot *= lot_size_increase
+          number_of_time_order_executed++
           return { data: response.data, status: true };
         }
 

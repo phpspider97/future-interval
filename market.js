@@ -12,7 +12,7 @@ let current_profit = 0;
 let total_profit = 0;
 let border_price;
 let number_of_time_order_executed = 0;
-let lot_size_array = [5, 13, 32, 80, 200, 500, 1250, 3125, 7813, 19533]
+let lot_size_array = [5, 12, 31, 78, 195]
 
 let border_buy_price;
 let border_buy_profit_price;
@@ -116,7 +116,9 @@ function wsConnect() {
                 console.log('==================BUY ORDER AT : ==================',Math.round(message?.spot_price))
                 await cancelAllOpenOrder()
                 current_running_order = 'buy'
-                await createOrder('buy')
+                if (number_of_time_order_executed <= 3) {
+                    await createOrder('buy')
+                }
             } 
             if(current_running_order == 'buy' && message?.spot_price<border_sell_price){
                 console.log('')
@@ -132,7 +134,9 @@ function wsConnect() {
                 console.log('==================SELL ORDER AT : ==================',Math.round(message?.spot_price))
                 await cancelAllOpenOrder()
                 current_running_order = 'sell' 
-                await createOrder('sell')
+                if (number_of_time_order_executed <= 3) {
+                    await createOrder('sell')
+                }
             }
  
             if (message?.spot_price > border_buy_profit_price || message?.spot_price < border_sell_profit_price) { 
@@ -244,6 +248,18 @@ async function cancelAllOpenOrder() {
 }
 
 async function createOrder(bidType,bitcoin_current_price) {
+    number_of_time_order_executed++; 
+    if (number_of_time_order_executed > 3) { 
+        console.log('Reached maximum allowed orders. Pausing bot for 30 minutes...');
+        orderInProgress = true; // block further orders
+        if(number_of_time_order_executed == 4){
+            setTimeout(async () => {
+            console.log('30 minutes over. Restarting bot...');
+            await init(); // resets lot size and order count
+            }, 30 * 60 * 1000); // 30 minutes in milliseconds
+        }
+        return { message: "Max orders executed, waiting for reset.", status: false };
+      }
       if(total_error_count>5){
         return true
       }
@@ -255,7 +271,7 @@ async function createOrder(bidType,bitcoin_current_price) {
         const bodyParams = {
           product_id: bitcoin_product_id,
           product_symbol: "BTCUSD",
-          size: lot_size_array[number_of_time_order_executed],
+          size: lot_size_array[number_of_time_order_executed-1],
           //size: (current_lot == 5)?current_lot:current_lot+20,
           side: bidType,   
           order_type: "market_order", 
@@ -274,7 +290,6 @@ async function createOrder(bidType,bitcoin_current_price) {
         const response = await axios.post(`${api_url}/v2/orders`, bodyParams, { headers });
          
         if (response.data.success) {
-          number_of_time_order_executed++; 
           current_lot *= lot_size_increase
           return { data: response.data, status: true };
         }

@@ -262,7 +262,7 @@ function sendEmail(message){
     let mailOptions = {
         from: 'phpspider97@gmail.com',
         to: 'neelbhardwaj97@gmail.com',
-        subject: 'Order created',
+        subject: 'Future order created.',
         text: JSON.stringify(message)
     };
     

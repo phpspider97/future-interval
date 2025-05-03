@@ -2,9 +2,18 @@ const axios = require('axios');
 const crypto = require('crypto');
 require('dotenv').config();
 const WebSocket = require('ws');
+const nodemailer = require('nodemailer');
 
 const EventEmitter = require('events');
 const emitter = new EventEmitter();
+
+let transporter = nodemailer.createTransport({
+    service: 'gmail',
+    auth: {
+      user: process.env.USER_EMAIL,
+      pass: process.env.USER_PASSWORD
+    },
+  }); 
 
 let bitcoin_product_id;
 let current_lot = 5
@@ -22,7 +31,7 @@ let border_sell_profit_price;
    
 let botRunning = true;
 let buy_sell_profit_point = 800
-let buy_sell_point = 400
+let buy_sell_point = 200
 let cancel_gap = 200
 let lot_size_increase = 2
 let total_error_count = 0
@@ -88,6 +97,8 @@ function wsConnect() {
     if (message.type === 'success' && message.message === 'Authenticated') {
       subscribe(ws, 'orders', ['all']);
       subscribe(ws, 'v2/ticker', ['BTCUSD']);
+      subscribe(ws, 'l2_orderbook', ['BTCUSD']);
+      subscribe(ws, 'spot_price', ['BTCUSD']);
       //subscribe(ws, 'positions', ['all']);
     } else {
         
@@ -99,6 +110,9 @@ function wsConnect() {
             ws.close(1000, 'Too many errors');
         } 
 
+        // if(message.type == "spot_price"){ 
+        //     console.log('data___ : ',message)
+        // }    
         if(message.type == "v2/ticker"){ 
             //console.log('Running spot price : ',Math.round(message?.spot_price))
             //console.log('current_running_order____',current_running_order,message?.spot_price)
@@ -244,19 +258,26 @@ async function cancelAllOpenOrder() {
   }
 }
 
+function sendEmail(message){
+    let mailOptions = {
+        from: 'phpspider97@gmail.com',
+        to: 'neelbhardwaj97@gmail.com',
+        subject: 'Order created',
+        text: JSON.stringify(message)
+    };
+    
+    transporter.sendMail(mailOptions, (error, info) => {
+        if (error) {
+            return console.log('Error:', error);
+        }
+        console.log('Email sent:', info.response);
+    });
+}
+
 async function createOrder(bidType,bitcoin_current_price) {
-    // number_of_time_order_executed++; 
-    // if (number_of_time_order_executed > 3) { 
-    //     console.log('Reached maximum allowed orders. Pausing bot for 30 minutes...');
-    //     orderInProgress = true; // block further orders
-    //     if(number_of_time_order_executed == 4){
-    //         setTimeout(async () => {
-    //         console.log('30 minutes over. Restarting bot...');
-    //         await init(); // resets lot size and order count
-    //         }, 30 * 60 * 1000); // 30 minutes in milliseconds
-    //     }
-    //     return { message: "Max orders executed, waiting for reset.", status: false };
-    //   }
+      if(number_of_time_order_executed>4){
+        number_of_time_order_executed = 0
+      }  
       if(total_error_count>5){
         return true
       }
@@ -268,7 +289,7 @@ async function createOrder(bidType,bitcoin_current_price) {
         const bodyParams = {
           product_id: bitcoin_product_id,
           product_symbol: "BTCUSD",
-          size: lot_size_array[number_of_time_order_executed-1],
+          size: lot_size_array[number_of_time_order_executed],
           //size: (current_lot == 5)?current_lot:current_lot+20,
           side: bidType,   
           order_type: "market_order", 
@@ -289,6 +310,7 @@ async function createOrder(bidType,bitcoin_current_price) {
         if (response.data.success) {
           current_lot *= lot_size_increase
           number_of_time_order_executed++
+          sendEmail(bodyParams)
           return { data: response.data, status: true };
         }
 
@@ -314,7 +336,7 @@ async function getCurrentPriceOfBitcoin() {
   }
 }
 
-async function init() {
+async function init() { 
     await cancelAllOpenOrder()
     const result = await getCurrentPriceOfBitcoin();
     if (!result.status) return;

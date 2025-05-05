@@ -275,7 +275,7 @@ function sendEmail(message){
 }
 
 async function createOrder(bidType,bitcoin_current_price) {
-      if(number_of_time_order_executed>4){
+      if(number_of_time_order_executed>2){
         number_of_time_order_executed = 0
       }  
       if(total_error_count>5){

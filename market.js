@@ -32,7 +32,7 @@ let border_sell_profit_price;
    
 let botRunning = true;
 let buy_sell_profit_point = 300
-let buy_sell_point = 200
+let buy_sell_point = 100
 let cancel_gap = 200
 let lot_size_increase = 2
 let total_error_count = 0

@@ -21,7 +21,8 @@ let current_profit = 0;
 let total_profit = 0;
 let border_price;
 let number_of_time_order_executed = 0;
-let lot_size_array = [12, 31, 78, 195]
+//let lot_size_array = [12, 31, 78, 195]
+let lot_size_array = [1, 3, 7, 18]
 
 let border_buy_price;
 let border_buy_profit_price;
@@ -30,7 +31,7 @@ let border_sell_price;
 let border_sell_profit_price;
    
 let botRunning = true;
-let buy_sell_profit_point = 800
+let buy_sell_profit_point = 300
 let buy_sell_point = 200
 let cancel_gap = 200
 let lot_size_increase = 2

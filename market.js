@@ -276,7 +276,7 @@ function sendEmail(message){
 }
 
 async function createOrder(bidType,bitcoin_current_price) {
-      if(number_of_time_order_executed>2){
+      if(number_of_time_order_executed>3){
         number_of_time_order_executed = 0
       }  
       if(total_error_count>5){
@@ -291,7 +291,6 @@ async function createOrder(bidType,bitcoin_current_price) {
           product_id: bitcoin_product_id,
           product_symbol: "BTCUSD",
           size: lot_size_array[number_of_time_order_executed],
-          //size: (current_lot == 5)?current_lot:current_lot+20,
           side: bidType,   
           order_type: "market_order", 
         };

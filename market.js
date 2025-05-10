@@ -329,7 +329,7 @@ async function createOrder(bidType,bitcoin_current_price) {
               </tr> 
           </table>
           `
-          sendEmail(message_template,`CREATE ORDER : ${order_information.product_symbol}`)
+          sendEmail(message_template,`CREATE ORDER : ${lot_size_array[number_of_time_order_executed]} - ${bidType}`)
           return { data: response.data, status: true };
         }
 

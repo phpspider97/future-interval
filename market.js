@@ -22,7 +22,7 @@ let total_profit = 0;
 let border_price;
 let number_of_time_order_executed = 0;
 //let lot_size_array = [12, 31, 78, 195]
-let lot_size_array = [1, 3, 7, 18]
+let lot_size_array = [1, 3, 9, 27]
 
 let border_buy_price;
 let border_buy_profit_price;
@@ -31,7 +31,7 @@ let border_sell_price;
 let border_sell_profit_price;
    
 let botRunning = true;
-let buy_sell_profit_point = 300
+let buy_sell_profit_point = 200
 let buy_sell_point = 100
 let cancel_gap = 200
 let lot_size_increase = 2
@@ -264,7 +264,7 @@ function sendEmail(message){
         from: 'phpspider97@gmail.com',
         to: 'neelbhardwaj97@gmail.com',
         subject: 'Future order created.',
-        text: JSON.stringify(message)
+        html: message
     };
     
     transporter.sendMail(mailOptions, (error, info) => {
@@ -276,7 +276,7 @@ function sendEmail(message){
 }
 
 async function createOrder(bidType,bitcoin_current_price) {
-      if(number_of_time_order_executed>3){
+      if(number_of_time_order_executed>2){
         number_of_time_order_executed = 0
       }  
       if(total_error_count>5){
@@ -310,7 +310,26 @@ async function createOrder(bidType,bitcoin_current_price) {
         if (response.data.success) {
           current_lot *= lot_size_increase
           number_of_time_order_executed++
-          sendEmail(bodyParams)
+          const message_template = `<br /><br /><br />
+          <table border="1" cellpadding="8" cellspacing="3">
+              <tr>
+                  <td>Size</td>
+                  <td>:</td>
+                  <td>${lot_size_array[number_of_time_order_executed]}</td> 
+              </tr>
+              <tr>
+                  <td>Side</td>
+                  <td>:</td>
+                  <td>${bidType}</td> 
+              </tr>
+              <tr>
+                  <td>Current Price</td>
+                  <td>:</td>
+                  <td>${bitcoin_current_price}</td> 
+              </tr> 
+          </table>
+          `
+          sendEmail(message_template,`CREATE ORDER : ${order_information.product_symbol}`)
           return { data: response.data, status: true };
         }
 

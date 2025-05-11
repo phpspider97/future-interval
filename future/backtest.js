@@ -2,7 +2,7 @@ const axios = require('axios');
 
 let now = Math.floor(Date.now() / 1000); // current time in seconds
  //now = now - (60 * 24 * 60 * 60); // 30 days in seconds
-const thirtyDaysAgo = now - (2 * 24 * 60 * 60); // 30 days in seconds
+const thirtyDaysAgo = now - (1 * 24 * 60 * 60); // 30 days in seconds
 
 // console.log('Start (30 days ago):', thirtyDaysAgo);
 // console.log('End (now):', now);
@@ -22,7 +22,7 @@ async function backtest() {
     const candles = response.data.result;
     
     let lot_size                =   [1, 3, 9, 27, 81, 243] 
-    let current_running_order   =   'sell'
+    let current_running_order   =   ''
     let loss                    =   0
     let profit                  =   0 
     let candle_index            =   0

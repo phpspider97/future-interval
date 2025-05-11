@@ -18,8 +18,8 @@ let transporter = nodemailer.createTransport({
 let bitcoin_product_id; 
 let current_profit = 0;
 let total_profit = 0;
-
-let lot_size_array = [1, 3, 9, 27, 81, 243]
+ 
+let lot_size_array = [1, 3, 9]
 
 let number_of_time_order_executed = 0
 
@@ -259,7 +259,7 @@ function sendEmail(message,subject){
 
 async function createOrder(bidType,bitcoin_current_price) {
       if(number_of_time_order_executed > lot_size_array.length-1){
-        number_of_time_order_executed = 0
+        number_of_time_order_executed = lot_size_array.length-1
       }  
       if(total_error_count>5){
         return true

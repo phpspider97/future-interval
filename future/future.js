@@ -264,8 +264,8 @@ async function createOrder(bidType,bitcoin_current_price) {
       if(total_error_count>5){
         return true
       }
-      // if (orderInProgress) return { message: "Order already in progress", status: false };
-      // orderInProgress = true
+      if (orderInProgress) return { message: "Order already in progress", status: false };
+      orderInProgress = true
       try { 
         const timestamp = Math.floor(Date.now() / 1000);
         const bodyParams = {
@@ -341,7 +341,7 @@ async function createOrder(bidType,bitcoin_current_price) {
 
         return { message: "Order failed", status: false };
       } catch (error) {
-        sendEmail(JSON.stringify(error.response?.data || error.message),`ERROR CREATE ORDER`)
+        sendEmail(JSON.stringify(error.response?.data) +'==>'+ JSON.stringif(error.message) ,`ERROR CREATE ORDER`)
         console.log('error.message___2_',JSON.stringify(error?.response?.data))
         total_error_count++
         project_error_message = JSON.stringify(error?.response?.data)

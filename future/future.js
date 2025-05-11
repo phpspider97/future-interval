@@ -101,12 +101,12 @@ function wsConnect() {
             ws.close(1000, 'Too many errors');
         }    
         if(message.type == "v2/ticker"){  
-            console.log('spot_price___',message?.close)
+            //console.log('spot_price___',message?.close)
             if(current_running_order == 'sell' && message?.close>border_buy_price){
                 console.log('');console.log('')
                 console.log('==================CLEAR SELL ORDER==================')
                 current_running_order = ''
-                sendEmail('',`LOSS IN ORDER : ${lot_size_array[number_of_time_order_executed]}`)
+                sendEmail('',`LOSS IN ORDER : ${lot_size_array[number_of_time_order_executed-1]}`)
             }
             if(current_running_order == '' && message?.close>border_buy_price){
                 console.log('');console.log('')
@@ -121,7 +121,7 @@ function wsConnect() {
                 console.log('');console.log('')
                 console.log('==================CLEAR BUY ORDER==================')
                 current_running_order = ''
-                sendEmail('',`LOSS IN ORDER : ${lot_size_array[number_of_time_order_executed]}`)
+                sendEmail('',`LOSS IN ORDER : ${lot_size_array[number_of_time_order_executed-1]}`)
             }
             if(current_running_order == '' && message?.close<border_sell_price){
                 console.log('');console.log('')
@@ -136,7 +136,7 @@ function wsConnect() {
             if (message?.close > border_buy_profit_price || message?.close < border_sell_profit_price) { 
                 console.log('RESER LOOP : ',message?.close,border_buy_profit_price,border_sell_profit_price)
                 console.log('cancel_order_on_profit___')
-                sendEmail('',`PROFIT IN ORDER : ${lot_size_array[number_of_time_order_executed]}`)
+                sendEmail('',`PROFIT IN ORDER : ${lot_size_array[number_of_time_order_executed-1]}`)
                 await cancelAllOpenOrder()
                 await resetLoop()
             }

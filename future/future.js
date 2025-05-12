@@ -22,6 +22,7 @@ let total_profit = 0;
 let lot_size_array = [1, 3, 9]
 
 let number_of_time_order_executed = 0
+let loss_limit_exceed = false
 
 let border_buy_price;
 let border_buy_profit_price;
@@ -153,7 +154,7 @@ function wsConnect() {
     number_of_time_order_executed = 0
     setTimeout(async () => {
         await init()
-    }, 5000)
+    }, 60000)
   }
   async function onClose(code, reason) {
     console.log(`Socket closed with code: ${code}, reason: ${reason}`)
@@ -258,10 +259,15 @@ function sendEmail(message,subject){
 }
 
 async function createOrder(bidType,bitcoin_current_price) {
-      if(number_of_time_order_executed > lot_size_array.length-1){
-        number_of_time_order_executed = lot_size_array.length-1
+      if(number_of_time_order_executed > lot_size_array.length-1 && loss_limit_exceed == false){
+        number_of_time_order_executed = 0
+        loss_limit_exceed = true
+        setTimeout(async () => {
+            loss_limit_exceed = false
+            await init()     
+        }, 1800000); // half hr
       }  
-      if(total_error_count>5){
+      if(total_error_count>5 || loss_limit_exceed == true){
         return true
       }
       if (orderInProgress) return { message: "Order already in progress", status: false };
@@ -380,7 +386,7 @@ async function init() {
     border_sell_profit_price = border_sell_price - buy_sell_profit_point
 
     order_exicuted_at_price = 0 
-    total_error_count = 0  
+    total_error_count = 0   
     
     futureEmitter.emit('log', { type: "init", spot_price });
     console.log('==================BUY PROFIT BORDER==================',border_buy_profit_price)

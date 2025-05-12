@@ -23,6 +23,7 @@ let lot_size_array = [1, 3, 9]
 
 let number_of_time_order_executed = 0
 let loss_limit_exceed = false
+let is_break_time = false
 
 let border_buy_price;
 let border_buy_profit_price;
@@ -98,48 +99,61 @@ function wsConnect() {
       subscribe(ws, 'orders', ['all']);
       subscribe(ws, 'v2/ticker', ['BTCUSD']); 
     } else {
+       
         if(total_error_count>5) { 
             ws.close(1000, 'Too many errors');
         }    
         if(message.type == "v2/ticker"){  
+            if (message?.close > border_buy_profit_price || message?.close < border_sell_profit_price && loss_limit_exceed == true) {
+                is_break_time = false
+                await init()
+            }
+            if(is_break_time == true || loss_limit_exceed == true){
+                return true
+            }
+
             //console.log('spot_price___',message?.close)
-            if(current_running_order == 'sell' && message?.close>border_buy_price && loss_limit_exceed == false ){
+            if(current_running_order == 'sell' && message?.close>border_buy_price){
                 console.log('');console.log('')
-                console.log('==================CLEAR SELL ORDER==================')
+                //console.log('==================CLEAR SELL ORDER==================')
                 current_running_order = ''
                 sendEmail('',`LOSS IN ORDER : ${lot_size_array[number_of_time_order_executed-1]}`)
             }
-            if(current_running_order == '' && message?.close>border_buy_price && loss_limit_exceed == false ){
+
+            if(current_running_order == '' && message?.close>border_buy_price){
                 console.log('');console.log('')
-                console.log('==================BUY PROFIT BORDER==================',border_buy_profit_price)
-                console.log('==================BUY BORDER==================',border_buy_price)
-                console.log('==================BUY ORDER AT : ==================',Math.round(message?.close))
+                // console.log('==================BUY PROFIT BORDER==================',border_buy_profit_price)
+                // console.log('==================BUY BORDER==================',border_buy_price)
+                // console.log('==================BUY ORDER AT : ==================',Math.round(message?.close))
                 await cancelAllOpenOrder()
                 current_running_order = 'buy'  
                 await createOrder('buy',message?.close)
             } 
-            if(current_running_order == 'buy' && message?.close<border_sell_price && loss_limit_exceed == false ){
+
+            if(current_running_order == 'buy' && message?.close<border_sell_price){
                 console.log('');console.log('')
-                console.log('==================CLEAR BUY ORDER==================')
+                // console.log('==================CLEAR BUY ORDER==================')
                 current_running_order = ''
                 sendEmail('',`LOSS IN ORDER : ${lot_size_array[number_of_time_order_executed-1]}`)
             }
-            if(current_running_order == '' && message?.close<border_sell_price && loss_limit_exceed == false ){
+
+            if(current_running_order == '' && message?.close<border_sell_price){
                 console.log('');console.log('')
-                console.log('==================SELL PROFIT BORDER==================',border_sell_profit_price)
-                console.log('==================SELL BORDER==================',border_sell_price)
-                console.log('==================SELL ORDER AT : ==================',Math.round(message?.close))
+                // console.log('==================SELL PROFIT BORDER==================',border_sell_profit_price)
+                // console.log('==================SELL BORDER==================',border_sell_price)
+                // console.log('==================SELL ORDER AT : ==================',Math.round(message?.close))
                 await cancelAllOpenOrder()
                 current_running_order = 'sell' 
                 await createOrder('sell',message?.close)
             }
  
             if (message?.close > border_buy_profit_price || message?.close < border_sell_profit_price ) { 
-                console.log('RESER LOOP : ',message?.close,border_buy_profit_price,border_sell_profit_price)
-                console.log('cancel_order_on_profit___')
-                if(loss_limit_exceed == false){
-                    sendEmail('',`PROFIT IN ORDER : ${lot_size_array[number_of_time_order_executed-1]}`)
-                }
+                is_break_time = true
+                //console.log('RESER LOOP : ',message?.close,border_buy_profit_price,border_sell_profit_price)
+                //console.log('cancel_order_on_profit___')
+                
+                sendEmail('',`PROFIT IN ORDER : ${lot_size_array[number_of_time_order_executed-1]}`)
+                
                 await cancelAllOpenOrder()
                 await resetLoop()
             }
@@ -156,6 +170,7 @@ function wsConnect() {
     number_of_time_order_executed = 0
     setTimeout(async () => {
         await init()
+        is_break_time = false
     }, 60000) // 1 min
   }
   async function onClose(code, reason) {

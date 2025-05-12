@@ -103,13 +103,13 @@ function wsConnect() {
         }    
         if(message.type == "v2/ticker"){  
             //console.log('spot_price___',message?.close)
-            if(current_running_order == 'sell' && message?.close>border_buy_price){
+            if(current_running_order == 'sell' && message?.close>border_buy_price && loss_limit_exceed == false ){
                 console.log('');console.log('')
                 console.log('==================CLEAR SELL ORDER==================')
                 current_running_order = ''
                 sendEmail('',`LOSS IN ORDER : ${lot_size_array[number_of_time_order_executed-1]}`)
             }
-            if(current_running_order == '' && message?.close>border_buy_price){
+            if(current_running_order == '' && message?.close>border_buy_price && loss_limit_exceed == false ){
                 console.log('');console.log('')
                 console.log('==================BUY PROFIT BORDER==================',border_buy_profit_price)
                 console.log('==================BUY BORDER==================',border_buy_price)
@@ -118,13 +118,13 @@ function wsConnect() {
                 current_running_order = 'buy'  
                 await createOrder('buy',message?.close)
             } 
-            if(current_running_order == 'buy' && message?.close<border_sell_price){
+            if(current_running_order == 'buy' && message?.close<border_sell_price && loss_limit_exceed == false ){
                 console.log('');console.log('')
                 console.log('==================CLEAR BUY ORDER==================')
                 current_running_order = ''
                 sendEmail('',`LOSS IN ORDER : ${lot_size_array[number_of_time_order_executed-1]}`)
             }
-            if(current_running_order == '' && message?.close<border_sell_price){
+            if(current_running_order == '' && message?.close<border_sell_price && loss_limit_exceed == false ){
                 console.log('');console.log('')
                 console.log('==================SELL PROFIT BORDER==================',border_sell_profit_price)
                 console.log('==================SELL BORDER==================',border_sell_price)
@@ -134,10 +134,12 @@ function wsConnect() {
                 await createOrder('sell',message?.close)
             }
  
-            if (message?.close > border_buy_profit_price || message?.close < border_sell_profit_price) { 
+            if (message?.close > border_buy_profit_price || message?.close < border_sell_profit_price ) { 
                 console.log('RESER LOOP : ',message?.close,border_buy_profit_price,border_sell_profit_price)
                 console.log('cancel_order_on_profit___')
-                sendEmail('',`PROFIT IN ORDER : ${lot_size_array[number_of_time_order_executed-1]}`)
+                if(loss_limit_exceed == false){
+                    sendEmail('',`PROFIT IN ORDER : ${lot_size_array[number_of_time_order_executed-1]}`)
+                }
                 await cancelAllOpenOrder()
                 await resetLoop()
             }
@@ -154,7 +156,7 @@ function wsConnect() {
     number_of_time_order_executed = 0
     setTimeout(async () => {
         await init()
-    }, 60000)
+    }, 60000) // 1 min
   }
   async function onClose(code, reason) {
     console.log(`Socket closed with code: ${code}, reason: ${reason}`)
@@ -262,12 +264,8 @@ async function createOrder(bidType,bitcoin_current_price) {
       if(number_of_time_order_executed > lot_size_array.length-1 && loss_limit_exceed == false){
         number_of_time_order_executed = 0
         loss_limit_exceed = true
-        setTimeout(async () => {
-            loss_limit_exceed = false
-            await init()     
-        }, 1800000); // half hr
       }  
-      if(total_error_count>5 || loss_limit_exceed == true){
+      if(total_error_count > 5 || loss_limit_exceed == true){
         return true
       }
       if (orderInProgress) return { message: "Order already in progress", status: false };
@@ -386,7 +384,8 @@ async function init() {
     border_sell_profit_price = border_sell_price - buy_sell_profit_point
 
     order_exicuted_at_price = 0 
-    total_error_count = 0   
+    total_error_count = 0  
+    loss_limit_exceed = false 
     
     futureEmitter.emit('log', { type: "init", spot_price });
     console.log('==================BUY PROFIT BORDER==================',border_buy_profit_price)

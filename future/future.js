@@ -19,7 +19,7 @@ let bitcoin_product_id;
 let current_profit = 0;
 let total_profit = 0;
  
-let lot_size_array = [1, 3, 9]
+let lot_size_array = [1, 3, 9] 
 
 let number_of_time_order_executed = 0
 let loss_limit_exceed = false
@@ -105,6 +105,7 @@ function wsConnect() {
         }    
         if(message.type == "v2/ticker"){  
             if (message?.mark_price > border_buy_profit_price || message?.mark_price < border_sell_profit_price && loss_limit_exceed == true) {
+                console.log('is_break_time___')
                 is_break_time = false
                 await init()
             }
@@ -384,6 +385,7 @@ async function getCurrentPriceOfBitcoin() {
 }
 
 async function init() { 
+    console.log('in_it__')
     await cancelAllOpenOrder()
     const result = await getCurrentPriceOfBitcoin() 
     if (!result?.data?.mark_price) return

@@ -3,6 +3,7 @@ const crypto = require('crypto');
 require('dotenv').config();
 const WebSocket = require('ws');
 const nodemailer = require('nodemailer');
+const { checkATR } = require('./getAtr.js')
 
 const EventEmitter = require('events');
 const futureEmitter = new EventEmitter();
@@ -31,7 +32,7 @@ let border_price;
 let border_sell_price;
 let border_sell_profit_price;
     
-let buy_sell_profit_point = 230
+let buy_sell_profit_point = 200
 let buy_sell_point = 50 
 
 let total_error_count = 0
@@ -92,6 +93,51 @@ function wsConnect() {
    
   async function onMessage(data) {
     const message = JSON.parse(data)  
+
+    if(message.type == "orders"){
+        if(message.state == 'closed' && message.meta_data.pnl != undefined){ 
+            console.log('message___',message)
+            let order_fill_at = message?.average_fill_price
+            let side = message?.side
+            let is_update = false
+
+            if(side == 'sell'){
+                let order_fill_difference = border_sell_price-order_fill_at
+                if(order_fill_difference>50){
+                    is_update = true
+                    border_buy_price -= order_fill_difference 
+                    border_buy_profit_price -= order_fill_difference
+        
+                    border_price -= order_fill_difference
+        
+                    border_sell_price -= order_fill_difference
+                    border_sell_profit_price -= order_fill_difference
+                } 
+            }
+            if(side == 'buy'){
+                let order_fill_difference = order_fill_at-border_buy_price
+                if(order_fill_difference>50){
+                    is_update = true
+                    border_buy_price += order_fill_difference 
+                    border_buy_profit_price += order_fill_difference
+        
+                    border_price += order_fill_difference
+        
+                    border_sell_price += order_fill_difference
+                    border_sell_profit_price += order_fill_difference
+                } 
+            }
+           if(is_update){
+            console.log('==================UPDATE BUY PROFIT BORDER==================',border_buy_profit_price)
+            console.log('==================UPDATE BUY BORDER==================',border_buy_price)
+            console.log('==================UPDATE CURRENT PRICE==================',spot_price)
+            console.log('==================UPDATE SELL BORDER==================',border_sell_price)
+            console.log('==================UPDATE SELL PROFIT BORDER==================',border_sell_profit_price)
+           }
+
+        }
+    }
+
     if(message.type == 'error'){
         console.log(message.message)
     }
@@ -99,7 +145,12 @@ function wsConnect() {
       subscribe(ws, 'orders', ['all']);
       subscribe(ws, 'v2/ticker', ['BTCUSD']); 
     } else {
-       
+        // let atr_value = await checkATR()
+        // if(atr_value>200){
+        //     await cancelAllOpenOrder()
+        //     return true
+        // }
+        //console.log('atr_value___', atr_value, message?.mark_price)
         if(total_error_count>5) { 
             ws.close(1000, 'Too many errors');
         }    
@@ -214,6 +265,65 @@ function wsConnect() {
   ws.on('close', onClose);
 }
 wsConnect();
+ 
+
+// setInterval(async ()=>{
+//     try{
+//         let atr_value = await checkATR()
+//         if(atr_value>200){
+//             return true
+//         }
+
+//         const result = await getCurrentPriceOfBitcoin()  
+//         let mark_price = result?.data?.mark_price
+
+//         console.log('atr_value___', atr_value, mark_price)
+
+//         if ( (mark_price > border_buy_profit_price || mark_price < border_sell_profit_price ) && loss_limit_exceed == true) {
+//             console.log('is_break_time___')
+//             is_break_time = false
+//             await init()
+//         }
+//         if(is_break_time == true || loss_limit_exceed == true){
+//             return true
+//         }
+
+//         if(current_running_order == 'sell' && mark_price>border_buy_price){
+//             console.log('');console.log('') 
+//             current_running_order = ''
+//             sendEmail('',`LOSS IN ORDER : ${lot_size_array[number_of_time_order_executed-1]}`)
+//         }
+
+//         if(current_running_order == '' && mark_price>border_buy_price){
+//             console.log('');console.log('') 
+//             await cancelAllOpenOrder()
+//             current_running_order = 'buy'  
+//             await createOrder('buy',mark_price)
+//         } 
+
+//         if(current_running_order == 'buy' && mark_price<border_sell_price){
+//             console.log('');console.log('') 
+//             current_running_order = ''
+//             sendEmail('',`LOSS IN ORDER : ${lot_size_array[number_of_time_order_executed-1]}`)
+//         }
+
+//         if(current_running_order == '' && mark_price<border_sell_price){
+//             console.log('');console.log('') 
+//             await cancelAllOpenOrder()
+//             current_running_order = 'sell' 
+//             await createOrder('sell',mark_price)
+//         }
+
+//         if (mark_price > border_buy_profit_price || mark_price < border_sell_profit_price ) { 
+//             is_break_time = true 
+//             sendEmail('',`PROFIT IN ORDER : ${lot_size_array[number_of_time_order_executed-1]}`)
+//             await cancelAllOpenOrder()
+//             await resetLoop()
+//         }
+//     }catch(error){
+//         sendEmail(error.message,`ERROR TO FETCH BITCOIN PRICE`)
+//     }
+// }, 1000)
 
 async function generateEncryptSignature(signaturePayload) { 
   return crypto.createHmac("sha256", secret).update(signaturePayload).digest("hex");
@@ -282,7 +392,7 @@ async function createOrder(bidType,bitcoin_current_price) {
           side: bidType,   
           order_type: "market_order", 
         };
-        //console.log('order_bodyParams___', bitcoin_current_price, bodyParams)
+        console.log('bodyParams', bitcoin_current_price, bodyParams)
         const signaturePayload = `POST${timestamp}/v2/orders${JSON.stringify(bodyParams)}`;
         const signature = await generateEncryptSignature(signaturePayload);
 
@@ -348,7 +458,7 @@ async function createOrder(bidType,bitcoin_current_price) {
 
         return { message: "Order failed", status: false };
       } catch (error) {
-        sendEmail(JSON.stringify(error.response?.data) +'==>'+ JSON.stringify(error.message) + JSON.stringify(bodyParams) ,`ERROR CREATE ORDER`)
+        sendEmail(JSON.stringify(error.response?.data) +'==>'+ JSON.stringify(error.message),`ERROR CREATE ORDER`)
         console.log('error.message___2_',JSON.stringify(error?.response?.data))
         total_error_count++
         project_error_message = JSON.stringify(error?.response?.data)

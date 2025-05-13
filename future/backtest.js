@@ -15,14 +15,24 @@ let total_order_trigger = 0
 let total_loss = 0
 let total_profit = 0
 const config = {
-    lot_size : [1,3,9],
-    total_loss_one_lot : 20 + 10, 
+    lot_size : [1, 3, 9],
+    total_loss_one_lot : 8 + 10, 
     total_profit_one_lot : 20 - 10, 
-    buy_trigger_price : 50,
-    buy_profit_price : 430,
-    sell_trigger_price : 50,
-    sell_profit_price :  430,
+    buy_trigger_price : 40,
+    buy_profit_price : 200,
+    sell_trigger_price : 40,
+    sell_profit_price :  200,
 };
+const config1 = {
+    lot_size: [1, 2, 4],                 // Safer scaling
+    total_loss_one_lot: 15,             // Lower risk
+    total_profit_one_lot: 20,           // Higher reward
+    buy_trigger_price: 50,              // Entry signal tighter
+    buy_profit_price: 200,               // Faster profit taking
+    sell_trigger_price: 50,
+    sell_profit_price: 200,
+};
+
 
 async function getHistoricalCandle(){
     const response = await axios.get(API_URL, {
@@ -33,12 +43,13 @@ async function getHistoricalCandle(){
 setTimeout( async ()=>{
     candles = await getHistoricalCandle()
     let count = 0
-    console.log('candles length : ', candles.length)
+    //console.log('candles length : ', JSON.stringify(candles))
     for(candle of candles){
         count++
         //console.log('total_order_trigger___',total_order_trigger)
-        if(count == 1 || total_order_trigger>config.lot_size.length-1){
-            total_order_trigger = (total_order_trigger>config.lot_size.length-1)?0:total_order_trigger
+        if(count == 1 || total_order_trigger>2){
+            total_order_trigger = (total_order_trigger>2)?0:total_order_trigger
+            current_order = ''
             await resetData(candle)
         } 
         //console.log(config.lot_size[total_order_trigger],total_order_trigger)
@@ -57,14 +68,15 @@ setTimeout( async ()=>{
             total_order_trigger++ 
         } 
         if (candle.close > border_buy_profit_price || candle.close < border_sell_profit_price ) { 
-            total_order_trigger = (total_order_trigger>config.lot_size.length-1)?0:total_order_trigger
+            total_order_trigger = (total_order_trigger>2)?0:total_order_trigger
+            //console.log('total_order_trigger__',total_order_trigger)
             total_profit += config.lot_size[total_order_trigger] * config.total_profit_one_lot
             total_order_trigger = 0
             current_order = '' 
             await resetData(candle)
         } 
     }
-    console.clear()
+    //console.clear()
     console.table({
         total_profit,
         total_loss,

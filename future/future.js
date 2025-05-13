@@ -361,7 +361,7 @@ async function createOrder(bidType,bitcoin_current_price) {
 
         return { message: "Order failed", status: false };
       } catch (error) {
-        sendEmail(JSON.stringify(error.response?.data) +'==>'+ JSON.stringify(error.message) ,`ERROR CREATE ORDER`)
+        sendEmail(JSON.stringify(error.response?.data) +'==>'+ JSON.stringify(error.message) + JSON.stringify(bodyParams) ,`ERROR CREATE ORDER`)
         console.log('error.message___2_',JSON.stringify(error?.response?.data))
         total_error_count++
         project_error_message = JSON.stringify(error?.response?.data)

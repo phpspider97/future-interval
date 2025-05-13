@@ -20,7 +20,7 @@ let bitcoin_product_id;
 let current_profit = 0;
 let total_profit = 0;
  
-let lot_size_array = [3, 3, 3] 
+let lot_size_array = [1, 1, 1] 
 
 let number_of_time_order_executed = 0
 let loss_limit_exceed = false
@@ -95,8 +95,7 @@ function wsConnect() {
     const message = JSON.parse(data)  
 
     if(message.type == "orders"){
-        if(message.state == 'closed' && message.meta_data.pnl != undefined){ 
-            //console.log('message___',message)
+        if(message.state == 'closed' && message.meta_data.pnl != undefined){  
             let order_fill_at = message?.average_fill_price
             let side = message?.side
             let is_update = false
@@ -107,9 +106,7 @@ function wsConnect() {
                     is_update = true
                     border_buy_price -= order_fill_difference 
                     border_buy_profit_price -= order_fill_difference
-        
                     border_price -= order_fill_difference
-        
                     border_sell_price -= order_fill_difference
                     border_sell_profit_price -= order_fill_difference
                 } 
@@ -120,21 +117,18 @@ function wsConnect() {
                     is_update = true
                     border_buy_price += order_fill_difference 
                     border_buy_profit_price += order_fill_difference
-        
                     border_price += order_fill_difference
-        
                     border_sell_price += order_fill_difference
                     border_sell_profit_price += order_fill_difference
                 } 
             }
            if(is_update){
-            console.log('==================UPDATE BUY PROFIT BORDER==================',border_buy_profit_price)
-            console.log('==================UPDATE BUY BORDER==================',border_buy_price)
-            console.log('==================UPDATE CURRENT PRICE==================',spot_price)
-            console.log('==================UPDATE SELL BORDER==================',border_sell_price)
-            console.log('==================UPDATE SELL PROFIT BORDER==================',border_sell_profit_price)
+                console.log('==================UPDATE BUY PROFIT BORDER==================',border_buy_profit_price)
+                console.log('==================UPDATE BUY BORDER==================',border_buy_price)
+                console.log('==================UPDATE CURRENT PRICE==================',border_price)
+                console.log('==================UPDATE SELL BORDER==================',border_sell_price)
+                console.log('==================UPDATE SELL PROFIT BORDER==================',border_sell_profit_price)
            }
-
         }
     }
 
@@ -391,12 +385,12 @@ async function createOrder(bidType,bitcoin_current_price) {
         const bodyParams = {
           product_id: bitcoin_product_id,
           product_symbol: "BTCUSD",
-          size: 3,
+          size: 1,
           //size: lot_size_array[number_of_time_order_executed],
           side: bidType,   
           order_type: "market_order", 
         };
-        console.log('bodyParams', bitcoin_current_price, bodyParams)
+        //console.log('bodyParams', bitcoin_current_price, bodyParams)
         const signaturePayload = `POST${timestamp}/v2/orders${JSON.stringify(bodyParams)}`;
         const signature = await generateEncryptSignature(signaturePayload);
 

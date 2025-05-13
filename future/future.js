@@ -20,7 +20,7 @@ let bitcoin_product_id;
 let current_profit = 0;
 let total_profit = 0;
  
-let lot_size_array = [1, 3, 9] 
+let lot_size_array = [3, 3, 3] 
 
 let number_of_time_order_executed = 0
 let loss_limit_exceed = false
@@ -96,7 +96,7 @@ function wsConnect() {
 
     if(message.type == "orders"){
         if(message.state == 'closed' && message.meta_data.pnl != undefined){ 
-            console.log('message___',message)
+            //console.log('message___',message)
             let order_fill_at = message?.average_fill_price
             let side = message?.side
             let is_update = false
@@ -155,12 +155,13 @@ function wsConnect() {
             ws.close(1000, 'Too many errors');
         }    
         if(message.type == "v2/ticker"){  
-            if ( (message?.mark_price > border_buy_profit_price || message?.mark_price < border_sell_profit_price ) && loss_limit_exceed == true) {
-                console.log('is_break_time___')
-                is_break_time = false
-                await init()
-            }
-            if(is_break_time == true || loss_limit_exceed == true){
+            // if ( (message?.mark_price > border_buy_profit_price || message?.mark_price < border_sell_profit_price ) && loss_limit_exceed == true) {
+            //     console.log('is_break_time___')
+            //     is_break_time = false
+            //     await init()
+            // }
+            //|| loss_limit_exceed == true
+            if(is_break_time == true){
                 return true
             }
  
@@ -374,11 +375,13 @@ function sendEmail(message,subject){
 }
 
 async function createOrder(bidType,bitcoin_current_price) {
-      if(number_of_time_order_executed > lot_size_array.length-1 && loss_limit_exceed == false){
+     //&& loss_limit_exceed == false
+      if(number_of_time_order_executed > lot_size_array.length-1){
         number_of_time_order_executed = 0
-        loss_limit_exceed = true
+        //loss_limit_exceed = true
       }  
-      if(total_error_count > 5 || loss_limit_exceed == true){
+      //|| loss_limit_exceed == true
+      if(total_error_count > 5){
         return true
       }
       if (orderInProgress) return { message: "Order already in progress", status: false };
@@ -388,7 +391,8 @@ async function createOrder(bidType,bitcoin_current_price) {
         const bodyParams = {
           product_id: bitcoin_product_id,
           product_symbol: "BTCUSD",
-          size: lot_size_array[number_of_time_order_executed],
+          size: 3,
+          //size: lot_size_array[number_of_time_order_executed],
           side: bidType,   
           order_type: "market_order", 
         };

@@ -10,8 +10,8 @@ const thirtyDaysAgo = now - (1 * 24 * 60 * 60); // 30 days in seconds
 const API_URL = 'https://api.india.delta.exchange/v2/history/candles';
 const symbol = 'BTCUSD';
 const resolution = '5m';
-const start = thirtyDaysAgo; // Replace with your desired UNIX timestamp
-const end = now;   // Replace with your desired UNIX timestamp
+const start = thirtyDaysAgo;
+const end = now;
 
 async function backtest() {
   try {
@@ -21,30 +21,28 @@ async function backtest() {
 
     const candles = response.data.result;
     
-    let lot_size                =   [1, 3, 9, 27, 81, 243] 
+    let lot_size                =   [1, 3, 11] 
     let current_running_order   =   ''
     let loss                    =   0
     let profit                  =   0 
     let candle_index            =   0
     var lot_array_count         =   0 
-    let trading_fees_one_lot    =   0.05
+    let trading_fees_one_lot    =   0.1
     let loss_one_lot            =   0.1
     let profit_one_lot          =   0.2
-    let crossCount              =   -1;
-    let loss_arr                =   []
-    let profite_arr              =   []
+    let crossCount              =   -1
 
     //console.log('candles___',candles)
     console.clear();
     for (const candle of candles) { 
-        if(lot_array_count>3){ lot_array_count = 0 }
+        if(lot_array_count>2){ lot_array_count = 0 }
         crossCount++
         let closePrice                  =   candle.close
         let first_close_caldle          =   candles[candle_index].close
-        let sell_stop_loss              =   first_close_caldle-50
-        let buy_stop_loss               =   first_close_caldle+50
-        let border_buy_profit_price     =   first_close_caldle+200
-        let border_sell_profit_price    =   first_close_caldle-100-200
+        let sell_stop_loss              =   first_close_caldle-150
+        let buy_stop_loss               =   first_close_caldle+150
+        let border_buy_profit_price     =   first_close_caldle+650
+        let border_sell_profit_price    =   first_close_caldle-650
        
         if(current_running_order == 'sell' && closePrice < sell_stop_loss){ 
             current_running_order = 'buy'

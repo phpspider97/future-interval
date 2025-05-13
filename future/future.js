@@ -2,8 +2,9 @@ const axios = require('axios');
 const crypto = require('crypto');
 require('dotenv').config();
 const WebSocket = require('ws');
-const nodemailer = require('nodemailer');
+const nodemailer = require('nodemailer') 
 const { checkATR } = require('./getAtr.js')
+const { classifyLastCandle } = require('./trend.js')
 
 const EventEmitter = require('events');
 const futureEmitter = new EventEmitter();
@@ -149,6 +150,8 @@ function wsConnect() {
             ws.close(1000, 'Too many errors');
         }    
         if(message.type == "v2/ticker"){  
+            let current_trend = await classifyLastCandle()
+            console.log('current_trend___',current_trend)
             // if ( (message?.mark_price > border_buy_profit_price || message?.mark_price < border_sell_profit_price ) && loss_limit_exceed == true) {
             //     console.log('is_break_time___')
             //     is_break_time = false
@@ -169,7 +172,9 @@ function wsConnect() {
                 console.log('');console.log('') 
                 await cancelAllOpenOrder()
                 current_running_order = 'buy'  
-                await createOrder('buy',message?.mark_price)
+                if(current_trend == 'bull' || current_trend == 'neutral'){
+                    await createOrder('buy',message?.mark_price)
+                }
             } 
 
             if(current_running_order == 'buy' && message?.mark_price<border_sell_price){
@@ -182,7 +187,9 @@ function wsConnect() {
                 console.log('');console.log('') 
                 await cancelAllOpenOrder()
                 current_running_order = 'sell' 
-                await createOrder('sell',message?.mark_price)
+                if(current_trend == 'bear' || current_trend == 'neutral'){
+                    await createOrder('sell',message?.mark_price)
+                }
             }
  
             if (message?.mark_price > border_buy_profit_price || message?.mark_price < border_sell_profit_price ) { 

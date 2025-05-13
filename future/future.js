@@ -32,7 +32,7 @@ let border_price;
 let border_sell_price;
 let border_sell_profit_price;
     
-let buy_sell_profit_point = 200
+let buy_sell_profit_point = 230
 let buy_sell_point = 50 
 
 let total_error_count = 0
@@ -103,7 +103,7 @@ function wsConnect() {
 
             if(side == 'sell'){
                 let order_fill_difference = border_sell_price-order_fill_at
-                if(order_fill_difference>50){
+                if(order_fill_difference>30){
                     is_update = true
                     border_buy_price -= order_fill_difference 
                     border_buy_profit_price -= order_fill_difference
@@ -116,7 +116,7 @@ function wsConnect() {
             }
             if(side == 'buy'){
                 let order_fill_difference = order_fill_at-border_buy_price
-                if(order_fill_difference>50){
+                if(order_fill_difference>30){
                     is_update = true
                     border_buy_price += order_fill_difference 
                     border_buy_profit_price += order_fill_difference

@@ -1,7 +1,7 @@
 const axios = require('axios')
 const { EMA, RSI, MACD } = require('technicalindicators')
 require('dotenv').config()
-const api_url = process.env.FUTURE_API_URL 
+const api_url = process.env.API_URL 
 const SYMBOL = 'BTCUSD'
 const INTERVAL = '5m'
  

@@ -39,8 +39,8 @@ let total_error_count = 0
 let orderInProgress = false   
 let current_running_order = ''
 
-const api_url = process.env.FUTURE_API_URL 
-const socket_url = process.env.FUTURE_API_URL_SOCKET 
+const api_url = process.env.API_URL 
+const socket_url = process.env.API_URL_SOCKET 
 const key = process.env.FUTURE_WEB_KEY
 const secret = process.env.FUTURE_WEB_SECRET 
 

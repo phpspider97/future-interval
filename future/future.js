@@ -2,9 +2,9 @@ const axios = require('axios');
 const crypto = require('crypto');
 require('dotenv').config();
 const WebSocket = require('ws');
-const nodemailer = require('nodemailer') 
-const { checkATR } = require('./getAtr.js')
+const nodemailer = require('nodemailer')   
 const { classifyLastCandle } = require('./trend.js')
+const fs = require('fs')
 
 const EventEmitter = require('events');
 const futureEmitter = new EventEmitter();
@@ -17,14 +17,12 @@ let transporter = nodemailer.createTransport({
     },
   }); 
 
-let bitcoin_product_id; 
-let current_profit = 0;
-let total_profit = 0;
+let bitcoin_product_id;  
  
 let lot_size_array = [1, 1, 1] 
+let is_live = false
 
-let number_of_time_order_executed = 0
-let loss_limit_exceed = false
+let number_of_time_order_executed = 0 
 let is_break_time = false
 
 let border_buy_price;
@@ -37,46 +35,25 @@ let buy_sell_profit_point = 230
 let buy_sell_point = 50 
 
 let total_error_count = 0
-
-let order_exicuted_at_price = 0
-let project_error_message = ""
-let current_balance = 0
+ 
 let orderInProgress = false   
 let current_running_order = ''
 
-const api_url = process.env.API_URL 
-const socket_url = process.env.API_URL_SOCKET 
-const key = process.env.WEB_KEY
-const secret = process.env.WEB_SECRET 
-
-function resetBot() {
-  current_lot = lot_size_array[number_of_time_order_executed];
-  botRunning = true;
-  current_profit = 0;
-  total_profit = 0;
-  ordersExecuted = 0;
-  buyExecuted = false;
-  sellExecuted = false;
-  border_price = 0;
-  project_error_message = '';
-  order_exicuted_at_price = 0;
-  futureEmitter.emit("log", { type: "info", message: "Bot reset triggered." });
-  init();
-}
+const api_url = process.env.FUTURE_API_URL 
+const socket_url = process.env.FUTURE_API_URL_SOCKET 
+const key = process.env.FUTURE_WEB_KEY
+const secret = process.env.FUTURE_WEB_SECRET 
 
 let reconnectInterval = 2000;
-function wsConnect() {
-  // Replace with your actual API credentials
+function wsConnect() { 
   const WEBSOCKET_URL = socket_url;
   const API_KEY = key;
   const API_SECRET = secret;
-
-  // Generate HMAC SHA256 signature
+ 
   function generateSignature(secret, message) {
     return crypto.createHmac('sha256', secret).update(message).digest('hex');
   }
-
-  // Subscribe to a specific channel with given symbols
+ 
   function subscribe(ws, channel, symbols) {
     const payload = {
       type: 'subscribe',
@@ -93,113 +70,109 @@ function wsConnect() {
   }
    
   async function onMessage(data) {
-    const message = JSON.parse(data)  
-
-    if(message.type == "orders"){
-        if(message.state == 'closed' && message.meta_data.pnl != undefined){  
-            let order_fill_at = message?.average_fill_price
-            let side = message?.side
-            let is_update = false
-
-            if(side == 'sell'){
-                let order_fill_difference = border_sell_price-order_fill_at
-                if(order_fill_difference>30){
-                    is_update = true
-                    border_buy_price -= order_fill_difference 
-                    border_buy_profit_price -= order_fill_difference
-                    border_price -= order_fill_difference
-                    border_sell_price -= order_fill_difference
-                    border_sell_profit_price -= order_fill_difference
-                } 
-            }
-            if(side == 'buy'){
-                let order_fill_difference = order_fill_at-border_buy_price
-                if(order_fill_difference>30){
-                    is_update = true
-                    border_buy_price += order_fill_difference 
-                    border_buy_profit_price += order_fill_difference
-                    border_price += order_fill_difference
-                    border_sell_price += order_fill_difference
-                    border_sell_profit_price += order_fill_difference
-                } 
-            }
-           if(is_update){
-                console.log('==================UPDATE BUY PROFIT BORDER==================',border_buy_profit_price)
-                console.log('==================UPDATE BUY BORDER==================',border_buy_price)
-                console.log('==================UPDATE CURRENT PRICE==================',border_price)
-                console.log('==================UPDATE SELL BORDER==================',border_sell_price)
-                console.log('==================UPDATE SELL PROFIT BORDER==================',border_sell_profit_price)
-           }
-        }
-    }
-
+    const message = JSON.parse(data)
     if(message.type == 'error'){
         console.log(message.message)
     }
     if (message.type === 'success' && message.message === 'Authenticated') {
       subscribe(ws, 'orders', ['all']);
       subscribe(ws, 'v2/ticker', ['BTCUSD']); 
-    } else {
-        // let atr_value = await checkATR()
-        // if(atr_value>200){
-        //     await cancelAllOpenOrder()
-        //     return true
-        // }
-        //console.log('atr_value___', atr_value, message?.mark_price)
+      subscribe(ws, 'margins'); 
+    } else { 
+        
         if(total_error_count>5) { 
             ws.close(1000, 'Too many errors');
+        }
+        if(message.type == "margins"){ 
+            console.log('message___',message)
         }    
-        if(message.type == "v2/ticker"){  
-            let current_trend = await classifyLastCandle()
-            console.log('current_trend___',current_trend)
-            // if ( (message?.mark_price > border_buy_profit_price || message?.mark_price < border_sell_profit_price ) && loss_limit_exceed == true) {
-            //     console.log('is_break_time___')
-            //     is_break_time = false
-            //     await init()
-            // }
-            //|| loss_limit_exceed == true
+        if(!is_live){
+            return true
+        }
+        if(message.type == "orders"){
+            if(message.state == 'closed' && message.meta_data.pnl != undefined){  
+                let order_fill_at = message?.average_fill_price
+                let side = message?.side
+                let is_update = false
+    
+                if(side == 'sell'){
+                    let order_fill_difference = border_sell_price-order_fill_at
+                    if(order_fill_difference>30){
+                        is_update = true
+                        border_buy_price -= order_fill_difference 
+                        border_buy_profit_price -= order_fill_difference
+                        border_price -= order_fill_difference
+                        border_sell_price -= order_fill_difference
+                        border_sell_profit_price -= order_fill_difference
+                    } 
+                }
+                if(side == 'buy'){
+                    let order_fill_difference = order_fill_at-border_buy_price
+                    if(order_fill_difference>30){
+                        is_update = true
+                        border_buy_price += order_fill_difference 
+                        border_buy_profit_price += order_fill_difference
+                        border_price += order_fill_difference
+                        border_sell_price += order_fill_difference
+                        border_sell_profit_price += order_fill_difference
+                    } 
+                }
+               if(is_update){
+                    console.log('==================UPDATE BUY PROFIT BORDER==================',border_buy_profit_price)
+                    console.log('==================UPDATE BUY BORDER==================',border_buy_price)
+                    console.log('==================UPDATE CURRENT PRICE==================',border_price)
+                    console.log('==================UPDATE SELL BORDER==================',border_sell_price)
+                    console.log('==================UPDATE SELL PROFIT BORDER==================',border_sell_profit_price)
+                    updateOrderInfo(JSON.stringify({
+                        bitcoin_product_id,
+                        border_buy_profit_price,
+                        border_buy_price,
+                        border_price,
+                        border_sell_price,
+                        border_sell_profit_price,
+                        is_update:true
+                    }))
+               }
+            }
+        }
+        if(message.type == "v2/ticker"){
             if(is_break_time == true){
                 return true
             }
- 
-            if(current_running_order == 'sell' && message?.mark_price>border_buy_price){
+            if(current_running_order == 'sell' && message?.close>border_buy_price){
                 console.log('');console.log('') 
                 current_running_order = ''
                 sendEmail('',`LOSS IN ORDER : ${lot_size_array[number_of_time_order_executed-1]}`)
             }
 
-            if(current_running_order == '' && message?.mark_price>border_buy_price){
+            if(current_running_order == '' && message?.close>border_buy_price){
                 console.log('');console.log('') 
                 await cancelAllOpenOrder()
-                current_running_order = 'buy'  
-                if(current_trend == 'bull' || current_trend == 'neutral'){
-                    await createOrder('buy',message?.mark_price)
-                }
+                current_running_order = 'buy'   
+                await createOrder('buy',message?.close)
             } 
 
-            if(current_running_order == 'buy' && message?.mark_price<border_sell_price){
+            if(current_running_order == 'buy' && message?.close<border_sell_price){
                 console.log('');console.log('') 
                 current_running_order = ''
                 sendEmail('',`LOSS IN ORDER : ${lot_size_array[number_of_time_order_executed-1]}`)
             }
 
-            if(current_running_order == '' && message?.mark_price<border_sell_price){
+            if(current_running_order == '' && message?.close<border_sell_price){
                 console.log('');console.log('') 
                 await cancelAllOpenOrder()
                 current_running_order = 'sell' 
-                if(current_trend == 'bear' || current_trend == 'neutral'){
-                    await createOrder('sell',message?.mark_price)
-                }
+                await createOrder('sell',message?.close)
             }
  
-            if (message?.mark_price > border_buy_profit_price || message?.mark_price < border_sell_profit_price ) { 
+            if (message?.close > border_buy_profit_price || message?.close < border_sell_profit_price ) { 
                 is_break_time = true 
                 sendEmail('',`PROFIT IN ORDER : ${lot_size_array[number_of_time_order_executed-1]}`)
                 await cancelAllOpenOrder()
                 await resetLoop()
             }
 
-            await triggerOrder(message?.mark_price)
+            await triggerOrder(message?.close)
         } 
     } 
   } 
@@ -267,66 +240,7 @@ function wsConnect() {
   ws.on('close', onClose);
 }
 wsConnect();
- 
-
-// setInterval(async ()=>{
-//     try{
-//         let atr_value = await checkATR()
-//         if(atr_value>200){
-//             return true
-//         }
-
-//         const result = await getCurrentPriceOfBitcoin()  
-//         let mark_price = result?.data?.mark_price
-
-//         console.log('atr_value___', atr_value, mark_price)
-
-//         if ( (mark_price > border_buy_profit_price || mark_price < border_sell_profit_price ) && loss_limit_exceed == true) {
-//             console.log('is_break_time___')
-//             is_break_time = false
-//             await init()
-//         }
-//         if(is_break_time == true || loss_limit_exceed == true){
-//             return true
-//         }
-
-//         if(current_running_order == 'sell' && mark_price>border_buy_price){
-//             console.log('');console.log('') 
-//             current_running_order = ''
-//             sendEmail('',`LOSS IN ORDER : ${lot_size_array[number_of_time_order_executed-1]}`)
-//         }
-
-//         if(current_running_order == '' && mark_price>border_buy_price){
-//             console.log('');console.log('') 
-//             await cancelAllOpenOrder()
-//             current_running_order = 'buy'  
-//             await createOrder('buy',mark_price)
-//         } 
-
-//         if(current_running_order == 'buy' && mark_price<border_sell_price){
-//             console.log('');console.log('') 
-//             current_running_order = ''
-//             sendEmail('',`LOSS IN ORDER : ${lot_size_array[number_of_time_order_executed-1]}`)
-//         }
-
-//         if(current_running_order == '' && mark_price<border_sell_price){
-//             console.log('');console.log('') 
-//             await cancelAllOpenOrder()
-//             current_running_order = 'sell' 
-//             await createOrder('sell',mark_price)
-//         }
-
-//         if (mark_price > border_buy_profit_price || mark_price < border_sell_profit_price ) { 
-//             is_break_time = true 
-//             sendEmail('',`PROFIT IN ORDER : ${lot_size_array[number_of_time_order_executed-1]}`)
-//             await cancelAllOpenOrder()
-//             await resetLoop()
-//         }
-//     }catch(error){
-//         sendEmail(error.message,`ERROR TO FETCH BITCOIN PRICE`)
-//     }
-// }, 1000)
-
+  
 async function generateEncryptSignature(signaturePayload) { 
   return crypto.createHmac("sha256", secret).update(signaturePayload).digest("hex");
 }
@@ -354,7 +268,6 @@ async function cancelAllOpenOrder() {
     return { data: response.data, status: true };
   } catch (error) { 
     project_error_message = JSON.stringify(error.response.data||error.message)
-    botRunning = false
     return { message: error.message, status: false };
   }
 }
@@ -376,12 +289,17 @@ function sendEmail(message,subject){
 }
 
 async function createOrder(bidType,bitcoin_current_price) {
-     //&& loss_limit_exceed == false
+        let current_trend = await classifyLastCandle() 
+        if(bidType == 'sell' && (current_trend == 'neutral' || current_trend == 'bull') ){
+            return true
+        }
+        if(bidType == 'buy' && (current_trend == 'neutral' || current_trend == 'bear') ){
+            return true
+        }
+     //return true
       if(number_of_time_order_executed > lot_size_array.length-1){
-        number_of_time_order_executed = 0
-        //loss_limit_exceed = true
-      }  
-      //|| loss_limit_exceed == true
+        number_of_time_order_executed = 0 
+      }   
       if(total_error_count > 5){
         return true
       }
@@ -467,8 +385,7 @@ async function createOrder(bidType,bitcoin_current_price) {
         console.log('error.message___2_',JSON.stringify(error?.response?.data))
         total_error_count++
         project_error_message = JSON.stringify(error?.response?.data)
-        orderInProgress = false; 
-        //botRunning = false
+        orderInProgress = false;  
         return { message: error?.message, status: false };
       } finally {
         orderInProgress = false;
@@ -490,8 +407,8 @@ async function init() {
     console.log('in_it__')
     await cancelAllOpenOrder()
     const result = await getCurrentPriceOfBitcoin() 
-    if (!result?.data?.mark_price) return
-    const spot_price = Math.round(result?.data?.mark_price)
+    if (!result?.data?.close) return
+    const spot_price = Math.round(result?.data?.close)
     bitcoin_product_id = result.data.product_id
     
     border_buy_price = spot_price + buy_sell_point
@@ -503,8 +420,7 @@ async function init() {
     border_sell_profit_price = border_sell_price - buy_sell_profit_point
 
     order_exicuted_at_price = 0 
-    total_error_count = 0  
-    loss_limit_exceed = false 
+    total_error_count = 0   
     
     futureEmitter.emit('log', { type: "init", spot_price });
     console.log('==================BUY PROFIT BORDER==================',border_buy_profit_price)
@@ -512,51 +428,87 @@ async function init() {
     console.log('==================CURRENT PRICE==================',spot_price)
     console.log('==================SELL BORDER==================',border_sell_price)
     console.log('==================SELL PROFIT BORDER==================',border_sell_profit_price)
+    updateOrderInfo(JSON.stringify({
+        bitcoin_product_id,
+        border_buy_profit_price,
+        border_buy_price,
+        border_price:spot_price,
+        border_sell_price,
+        border_sell_profit_price,
+        is_update:false
+    }))
 }
 
-async function triggerOrder(current_price,openPosition) {
-  try{
-    // Calculate current profit
-    if (current_price > border_buy_price) {
-      current_profit = ((current_price - border_buy_price) / 1000) * lot_size_array[number_of_time_order_executed];
-    } else if (current_price < border_sell_price) {
-      current_profit = ((border_sell_price - current_price) / 1000) * lot_size_array[number_of_time_order_executed];
+async function getBalance() {
+    try {   
+        const timestamp = Math.floor(Date.now() / 1000)
+        const signaturePayload = `GET${timestamp}/v2/wallet/balances`;
+        const signature = await generateEncryptSignature(signaturePayload);
+
+        const headers = {
+            "api-key": key,
+            "signature": signature,
+            "timestamp": timestamp,
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+        }; 
+        const response = await axios.get(`${api_url}/v2/wallet/balances`, { headers })
+        return response.data.result[0].balance_inr
+    } catch (err) {
+        console.log('err__',err)
     }
+}
 
-    // Emit updates
-    futureEmitter.emit("update", {
-      bitcoin_product_id:bitcoin_product_id,
-      border_price:border_price,
-      border_buy_price:border_buy_price,
-      border_buy_profit_price:border_buy_profit_price,
-      border_sell_price:border_sell_price,
-      border_sell_profit_price:border_sell_profit_price,
-      price: current_price,
-      lot: lot_size_array[number_of_time_order_executed],
-      profit: current_profit.toFixed(2),
-      totalProfit: total_profit.toFixed(2),
-      ordersExecuted: number_of_time_order_executed,
-      order_exicuted_at_price: order_exicuted_at_price,
-      project_error_message: project_error_message,
-      current_balance: current_balance
+(function() { 
+    is_live = (fs.statSync('./future/orderInfo.json').size != 0)?true:false
+})();
+  
+async function updateOrderInfo(content){
+    fs.writeFile('./future/orderInfo.json', content, (err) => {
+        if (err) {
+            console.error('Error writing file:', err);
+        } else {
+            console.log('File created and text written successfully.');
+        }
+    });
+}
+async function socketEventInfo(current_price){
+    let current_balance = await getBalance()
+    is_live = (fs.existsSync('./future/orderInfo.json'))?true:false
+    let order_data = fs.readFileSync('./future/orderInfo.json', 'utf8')
+    order_data = JSON.parse(order_data) 
+
+    futureEmitter.emit("future_trade_info", {
+        balance : current_balance,
+        product_symbol : "BTCUSD",
+        bitcoin_product_id : order_data.bitcoin_product_id??0,
+        current_price : current_price??0,
+        border_buy_profit_price : order_data.border_buy_profit_price??0,
+        border_buy_price : order_data.border_buy_price??0,
+        border_price : order_data.border_price??0, 
+        border_sell_price : order_data.border_sell_price??0,
+        border_sell_profit_price : order_data.border_sell_profit_price??0,
+        is_update : order_data.is_update??0,
+        is_live : is_live
     })
-  }catch(error){
-    botRunning = false
-    console.log('error____',error)
-  }
 }
- 
-futureEmitter.on("stop", () => {
-  botRunning = false; 
-  futureEmitter.emit("log", { type: "warn", message: "Bot has been stopped." });
-});
-
-async function startFutureBot() { 
-  init()
+async function triggerOrder(current_price) {
+    try{
+        socketEventInfo(current_price)
+    }catch(error){ 
+        console.log('error____',error)
+    }
 }
 
-futureEmitter.on("restart", () => {
-  resetBot();
-});
+futureEmitter.on("future_start", () => { 
+    init() 
+})
 
-module.exports = { startFutureBot, futureEmitter };
+futureEmitter.on("future_stop", async () => { 
+    await cancelAllOpenOrder() 
+    fs.writeFileSync('./future/orderInfo.json', '', 'utf8')
+    is_live = false
+    socketEventInfo() 
+})
+
+module.exports = { futureEmitter }

@@ -69,7 +69,7 @@ function wsConnect() {
     ws.send(JSON.stringify(payload));
   }
    
-  async function onMessage(data) {
+  async function onMessage(data) { 
     const message = JSON.parse(data)
     if(message.type == 'error'){
         console.log(message.message)
@@ -165,13 +165,13 @@ function wsConnect() {
                 await createOrder('sell',message?.close)
             }
  
-            if (message?.close > border_buy_profit_price || message?.close < border_sell_profit_price ) { 
+            if (message?.close > border_buy_profit_price || message?.close < border_sell_profit_price ) {
                 is_break_time = true 
                 sendEmail('',`PROFIT IN ORDER : ${lot_size_array[number_of_time_order_executed-1]}`)
                 await cancelAllOpenOrder()
                 await resetLoop()
             }
-
+            //console.log('close_price___',message?.close,border_buy_profit_price)
             await triggerOrder(message?.close)
         } 
     } 
@@ -181,6 +181,7 @@ function wsConnect() {
     console.error('Socket Error:', error.message);
   }
   async function resetLoop(){
+    console.log('enter reset')
     number_of_time_order_executed = 0
     setTimeout(async () => {
         await init()
@@ -315,7 +316,7 @@ async function createOrder(bidType,bitcoin_current_price) {
           side: bidType,   
           order_type: "market_order", 
         };
-        //console.log('bodyParams', bitcoin_current_price, bodyParams)
+        console.log('bodyParams', bitcoin_current_price, bodyParams)
         const signaturePayload = `POST${timestamp}/v2/orders${JSON.stringify(bodyParams)}`;
         const signature = await generateEncryptSignature(signaturePayload);
 
@@ -461,6 +462,17 @@ async function getBalance() {
 
 (function() { 
     is_live = (fs.statSync('./future/orderInfo.json').size != 0)?true:false
+    if(is_live){
+        let order_data = fs.readFileSync('./future/orderInfo.json', 'utf8')
+        order_data = JSON.parse(order_data) 
+        bitcoin_product_id = order_data.bitcoin_product_id
+        border_buy_profit_price = order_data.border_buy_profit_price
+        border_buy_price = order_data.border_buy_price
+        border_price = order_data.border_price 
+        border_sell_price = order_data.border_sell_price
+        border_sell_profit_price = order_data.border_sell_profit_price
+        is_update = order_data.is_update
+    }
 })();
   
 async function updateOrderInfo(content){
@@ -477,6 +489,7 @@ async function socketEventInfo(current_price){
     is_live = (fs.existsSync('./future/orderInfo.json'))?true:false
     let order_data = fs.readFileSync('./future/orderInfo.json', 'utf8')
     order_data = JSON.parse(order_data) 
+    let current_trend = await classifyLastCandle()
 
     futureEmitter.emit("future_trade_info", {
         balance : current_balance,
@@ -489,7 +502,8 @@ async function socketEventInfo(current_price){
         border_sell_price : order_data.border_sell_price??0,
         border_sell_profit_price : order_data.border_sell_profit_price??0,
         is_update : order_data.is_update??0,
-        is_live : is_live
+        is_live : is_live,
+        current_trend
     })
 }
 async function triggerOrder(current_price) {
@@ -508,7 +522,7 @@ futureEmitter.on("future_stop", async () => {
     await cancelAllOpenOrder() 
     fs.writeFileSync('./future/orderInfo.json', '', 'utf8')
     is_live = false
-    socketEventInfo() 
+    //socketEventInfo() 
 })
 
 module.exports = { futureEmitter }

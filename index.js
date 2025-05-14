@@ -12,7 +12,7 @@ const io = new Server(server);
 futureEmitter.on("future_trade_info", (data) => { 
     io.emit("future_trade_info", data)
 })  
-app.get('/future', (req, res) => {  
+app.get('/', (req, res) => {  
     res.sendFile(path.join(__dirname, 'public', 'future.html'));
 })  
  

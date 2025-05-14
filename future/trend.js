@@ -53,14 +53,14 @@ async function classifyLastCandle() {
   } else {
     candle_status = 'neutral'
   }
-  console.clear()
-  console.table({
-    candle_status,
-    close: lastCandle.close,
-    open: lastCandle.open,
-    EMA9: lastEMA,
-    RSI14: lastRSI
-  })
+//   console.clear()
+//   console.table({
+//     candle_status,
+//     close: lastCandle.close,
+//     open: lastCandle.open,
+//     EMA9: lastEMA,
+//     RSI14: lastRSI
+//   })
   return candle_status
 }
 

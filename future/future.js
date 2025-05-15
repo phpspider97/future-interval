@@ -514,14 +514,14 @@ async function triggerOrder(current_price) {
 
 futureEmitter.on("future_start", () => { 
     init() 
-    sendEmail('',`BOT ▶ START BUTTON PRESSED`)
+    sendEmail('',`BOT START BUTTON PRESSED`)
 })
 
 futureEmitter.on("future_stop", async () => { 
     await cancelAllOpenOrder() 
     fs.writeFileSync('./future/orderInfo.json', '', 'utf8')
     is_live = false 
-    sendEmail('',`BOT ⛔ STOP BUTTON PRESSED`)
+    sendEmail('',`BOT STOP BUTTON PRESSED`)
 })
 
 module.exports = { futureEmitter }

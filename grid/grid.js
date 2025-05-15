@@ -18,7 +18,7 @@ let transporter = nodemailer.createTransport({
 }) 
 function sendEmail(message,subject){
     if(!is_live){
-        return false
+        return true
     }
     let mailOptions = {
         from: 'phpspider97@gmail.com',
@@ -325,20 +325,20 @@ async function getBalance() {
     }
 }
 
-// (function() { 
-//   is_live = (fs.statSync('./grid/orderInfo.json').size != 0)?true:false
-//   console.log('start___is_live___',is_live)
-//   if(is_live){
-//       let order_data = fs.readFileSync('./grid/orderInfo.json', 'utf8')
-//       order_data = JSON.parse(order_data) 
+(function() { 
+  is_live = (fs.statSync('./grid/orderInfo.json').size != 0)?true:false
+  console.log('start___is_live___',is_live)
+  if(is_live){
+      let order_data = fs.readFileSync('./grid/orderInfo.json', 'utf8')
+      order_data = JSON.parse(order_data) 
     
-//       bitcoin_product_id = order_data.bitcoin_product_id
-//       upper_price = order_data.upper_price
-//       border_buy_price = order_data.border_buy_price
-//       lower_price = order_data.lower_price 
-//       grid_spacing = order_data.grid_spacing 
-//   }
-// })();
+      bitcoin_product_id = order_data.bitcoin_product_id
+      upper_price = order_data.upper_price
+      border_buy_price = order_data.border_buy_price
+      lower_price = order_data.lower_price 
+      grid_spacing = order_data.grid_spacing 
+  }
+})();
 
 async function updateOrderInfo(content){
     fs.writeFile('./grid/orderInfo.json', content, (error) => {

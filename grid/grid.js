@@ -387,8 +387,8 @@ gridEmitter.on("grid_start", async () => {
 gridEmitter.on("grid_stop", async () => { 
     await cancelAllOpenOrder() 
     fs.writeFileSync('./grid/orderInfo.json', '', 'utf8')
-    is_live = false 
     sendEmail('',`BOT STOP BUTTON PRESSED`)
+    is_live = false 
 })
 
 module.exports = { gridEmitter }

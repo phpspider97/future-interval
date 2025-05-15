@@ -1,0 +1,3 @@
+{
+    "ignore": ["cross/orderInfo.json","super-trend/orderInfo.json"]
+}  

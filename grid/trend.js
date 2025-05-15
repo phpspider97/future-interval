@@ -27,7 +27,7 @@ async function fetchCandles(limit = 100) {
   }));
 }
  
-async function findCandleTrend() {
+async function classifyLastCandle() {
     const candles = await fetchCandles();
   
     if (candles.length < 50) {
@@ -89,7 +89,22 @@ async function findCandleTrend() {
     } else if (isBearish) {
       candle_status = 'bear';
     }
+  
+    // console.clear();
+    // console.table({
+    //   Time: new Date(lastCandle.time * 1000).toISOString(),
+    //   Open: lastCandle.open,
+    //   Close: lastCandle.close,
+    //   High: lastCandle.high,
+    //   Low: lastCandle.low,
+    //   EMA9: lastEMA9.toFixed(2),
+    //   EMA21: lastEMA21.toFixed(2),
+    //   RSI14: lastRSI.toFixed(2),
+    //   MACD: lastMACD.MACD.toFixed(2),
+    //   Signal: lastMACD.signal.toFixed(2),
+    //   CandleStatus: candle_status,
+    // });
     return candle_status
 }
 
-module.exports = { findCandleTrend }
+module.exports = { classifyLastCandle }

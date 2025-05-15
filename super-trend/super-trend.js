@@ -5,21 +5,21 @@ const SYMBOL = 'BTCUSD'
 const INTERVAL = '5m'
 const fs = require('fs')
 const nodemailer = require('nodemailer') 
-const { EMA } = require('technicalindicators')
+const { ATR } = require('technicalindicators')
 const { classifyLastCandle } = require('./trend.js')
 
 const EventEmitter = require('events')
-const crossEmitter = new EventEmitter()
+const superTrendEmitter = new EventEmitter()
 
   
-const key = process.env.CROSS_WEB_KEY
-const secret = process.env.CROSS_WEB_SECRET 
+const key = process.env.SUPER_TREND_WEB_KEY
+const secret = process.env.SUPER_TREND_WEB_SECRET 
 const api_url = process.env.API_URL 
 
 let bitcoin_current_price = 0 
 let order_type = ''
-let cross_over_interval
-let cross_over_type = ''
+let super_trend_over_interval
+let signal_type = ''
 let total_error_count = 0
 let number_of_time_order_executed = 0
 let current_order_status = ''
@@ -34,7 +34,7 @@ let transporter = nodemailer.createTransport({
 
 async function fetchCandles() {
     const end_time_stamp = Math.floor(Date.now() / 1000)
-    const start_time_stamp = end_time_stamp - (20 * 60 * 60)
+    const start_time_stamp = end_time_stamp - (2 * 60 * 60)
 
     try {
         const response = await axios.get(`${api_url}/v2/history/candles`, {
@@ -45,9 +45,8 @@ async function fetchCandles() {
                 end : end_time_stamp 
             }
         }); 
-        const candles = response.data.result 
-        const closePrices = candles.map(c => parseFloat(c.close));
-        return closePrices.reverse()
+        const candles = response.data.result  
+        return candles.reverse()
 
     } catch (err) {
         console.error('❌ Error fetching candles:', err.message);
@@ -55,51 +54,73 @@ async function fetchCandles() {
     }
 }
 
-async function checkCrossOver(){
-    const result = await getCurrentPriceOfBitcoin() 
-    bitcoin_current_price = result?.data?.close
-    bitcoin_product_id = result.data.product_id 
-
-    const closes = await fetchCandles() 
-    if (closes.length < 21) {
-      console.log('⚠️ Not enough data to calculate EMAs');
-      return;
+function calculateSupertrend(candles, period, multiplier) {
+    const high = candles.map(c => parseFloat(c.high));
+    const low = candles.map(c => parseFloat(c.low));
+    const close = candles.map(c => parseFloat(c.close));
+    const atr = ATR.calculate({ high, low, close, period });
+  
+    const result = [];
+    for (let i = 0; i < atr.length; i++) {
+      const idx = i + period;
+      const hl2 = (high[idx] + low[idx]) / 2;
+      const upperBand = hl2 + multiplier * atr[i];
+      const lowerBand = hl2 - multiplier * atr[i];
+      const closePrice = close[idx];
+  
+      let trend = 'none';
+      if (i > 0 && result[i - 1]) {
+        const prevTrend = result[i - 1].trend;
+        trend = (closePrice > result[i - 1].upperBand) ? 'up'
+              : (closePrice < result[i - 1].lowerBand) ? 'down'
+              : prevTrend;
+      } else {
+        trend = 'down';
+      }
+  
+      result.push({
+        time: candles[idx].time,
+        upperBand,
+        lowerBand,
+        trend
+      });
     }
- 
-    const ema9 = EMA.calculate({ period: 9, values: closes });
-    const ema21 = EMA.calculate({ period: 21, values: closes });
- 
-    if (ema9.length >= 2 && ema21.length >= 2) {
-        const currentEMA9 = ema9[ema9.length - 1];
-        const previousEMA9 = ema9[ema9.length - 2];
-        const currentEMA21 = ema21[ema21.length - 1];
-        const previousEMA21 = ema21[ema21.length - 2];
+    //console.log(result)
+    return result;
+}
+function getSignal(supertrend) {
+    const latest = supertrend[supertrend.length - 1];
+    return latest.trend === 'up' ? 'buy' : 'sell';
+}
+async function checkSuperTrend(){
+    try{
+        const result = await getCurrentPriceOfBitcoin() 
+        bitcoin_current_price = result?.data?.close
+        bitcoin_product_id = result.data.product_id 
+        const candles = await fetchCandles() 
+        // if (candles.length < 21) {
+        //     console.log('⚠️ Not enough data to calculate EMAs');
+        //     return;
+        // } 
+        const supertrend = calculateSupertrend(candles, 10, 3);
+        const signal = getSignal(supertrend);
+        //console.log(`[${new Date().toISOString()}] Signal: ${signal}`)
+        current_order_status = signal
 
-        if (previousEMA9 < previousEMA21 && currentEMA9 > currentEMA21) {
-            console.log('Bullish crossover (EMA9 crossed above EMA21)')
-            createOrder('buy')
-            order_type = 'Buy'
-            cross_over_type = 'Bullish'
-        } else if (previousEMA9 > previousEMA21 && currentEMA9 < currentEMA21) {
-            console.log('Bearish crossover (EMA9 crossed below EMA21)');
-            createOrder('sell')
-            order_type = 'Sell'
-            cross_over_type = 'Bearish'
-        } else { 
-            order_type = 'Neutral' 
-            cross_over_type = 'Neutral'
+        if(current_order_status != signal){
+            await createOrder(signal)
         }
-
+            
         updateOrderInfo(JSON.stringify({
             bitcoin_product_id,  
             current_price : bitcoin_current_price??0,
-            order_type,
-            currentEMA9,
-            currentEMA21,
-            cross_over_type
+            signal_type : signal.toUpperCase()
         }))
+
+        triggerOrder(bitcoin_current_price)
+    }catch(error){
+        console.log('error : ', error)
     }
-    triggerOrder(bitcoin_current_price)
 }
 
 async function getCurrentPriceOfBitcoin() {
@@ -123,7 +144,7 @@ async function cancelAllOpenOrder() {
     const bodyParams = {
       close_all_portfolio: true,
       close_all_isolated: true,
-      user_id: process.env.FUTURE_WEB_USER_ID,
+      user_id: process.env.SUPER_TREND_WEB_USER_ID,
     }; 
     const signaturePayload = `POST${timestamp}/v2/positions/close_all${JSON.stringify(bodyParams)}`;
     const signature = await generateEncryptSignature(signaturePayload);
@@ -147,7 +168,7 @@ function sendEmail(message,subject){
     let mailOptions = {
         from: 'phpspider97@gmail.com',
         to: 'neelbhardwaj97@gmail.com',
-        subject: 'CROSS BOT : ' +subject,
+        subject: 'SUPER TREND BOT : ' + subject,
         html: message
     };
     
@@ -160,13 +181,10 @@ function sendEmail(message,subject){
 }
 
 async function createOrder(bidType) {
-  try { 
-    if(current_order_status == bidType){
-      return true
-    }
+  try {
     if(!is_live){
       return true
-    }
+    } 
     const timestamp = Math.floor(Date.now() / 1000);
     const bodyParams = {
       product_id: bitcoin_product_id,
@@ -187,8 +205,7 @@ async function createOrder(bidType) {
     };
     const response = await axios.post(`${api_url}/v2/orders`, bodyParams, { headers });
     
-    if (response.data.success) { 
-      current_order_status = bidType
+    if (response.data.success) {  
       const message_template = `<br /><br /><br />
       <table border="1" cellpadding="8" cellspacing="3">
           <tr>
@@ -241,7 +258,7 @@ async function getBalance() {
           "Accept": "application/json",
       }; 
       const response = await axios.get(`${api_url}/v2/wallet/balances`, { headers })
-      //console.log('response : ',response.data)
+      //console.log('balance_response : ',response.data)
       return response.data.result[0].balance_inr
   } catch (err) {
       console.log('err__',err)
@@ -249,29 +266,23 @@ async function getBalance() {
 }
  
 function init() { 
-  is_live = (fs.statSync('./cross/orderInfo.json').size != 0)?true:false 
+  is_live = (fs.statSync('./super-trend/orderInfo.json').size != 0)?true:false 
   //console.log('is_live___',is_live)
   if(is_live){
-      let order_data = fs.readFileSync('./cross/orderInfo.json', 'utf8')
+      let order_data = fs.readFileSync('./super-trend/orderInfo.json', 'utf8')
       order_data = JSON.parse(order_data) 
       bitcoin_product_id = order_data.bitcoin_product_id
-      bitcoin_current_price = order_data.current_price??0,
-      currentEMA9 = order_data.currentEMA9??0,
-      currentEMA21 = order_data.currentEMA21??0,
-      cross_over_type = order_data.cross_over_type??''
-      cross_over_interval = setInterval( async () => {
-        await checkCrossOver()
+      bitcoin_current_price = order_data.current_price??0, 
+      signal_type = order_data.signal_type??''
+      super_trend_over_interval = setInterval( async () => { 
+        await checkSuperTrend()
       }, 5000)
   }
 }
 init() 
-
-// async function scheduleCrossCheck() {
-//   setTimeout(scheduleCrossCheck, 3000)
-// }
-
+  
 async function updateOrderInfo(content){
-  fs.writeFile('./cross/orderInfo.json', content, (err) => {
+  fs.writeFile('./super-trend/orderInfo.json', content, (err) => {
       if (err) {
           console.error('Error writing file:', err);
       } else {
@@ -282,25 +293,23 @@ async function updateOrderInfo(content){
 async function socketEventInfo(current_price){ 
   let order_data = {}
   let current_balance = await getBalance() 
-  is_live = (fs.statSync('./cross/orderInfo.json').size != 0)?true:false
+  is_live = (fs.statSync('./super-trend/orderInfo.json').size != 0)?true:false
   if(is_live){
-      order_data = fs.readFileSync('./cross/orderInfo.json', 'utf8')
+      order_data = fs.readFileSync('./super-trend/orderInfo.json', 'utf8')
       order_data = JSON.parse(order_data) 
   }
   
   let current_trend = await classifyLastCandle()
 
-  crossEmitter.emit("cross_trade_info", {
+  superTrendEmitter.emit("super_trend_trade_info", {
       balance : current_balance,
       product_symbol : "BTCUSD",
       bitcoin_product_id : order_data.bitcoin_product_id??0,
+      signal_type : order_data.signal_type??0,
       current_price : current_price??0,
       order_type : order_type??0,
       is_live : is_live,
-      current_trend,
-      currentEMA9 : order_data.currentEMA9??0,
-      currentEMA21 : order_data.currentEMA21??0,
-      cross_over_type
+      current_trend
   })
 }
 async function triggerOrder(current_price) {
@@ -311,9 +320,10 @@ async function triggerOrder(current_price) {
   }
 }
  
-crossEmitter.on("cross_start", async () => { 
+superTrendEmitter.on("super_trend_start", async () => { 
   try{
-    await checkCrossOver()
+    //console.log('checkSuperTrend')
+    await checkSuperTrend()
     setTimeout(()=>{
         init() 
     },1000)
@@ -323,11 +333,11 @@ crossEmitter.on("cross_start", async () => {
   }
 })
 
-crossEmitter.on("cross_stop", async () => { 
+superTrendEmitter.on("super_trend_stop", async () => { 
   is_live = false 
-  clearInterval(cross_over_interval)
+  clearInterval(super_trend_over_interval)
   await cancelAllOpenOrder() 
-  fs.writeFileSync('./cross/orderInfo.json', '', 'utf8')
+  fs.writeFileSync('./super-trend/orderInfo.json', '', 'utf8')
 })
 
-module.exports = { crossEmitter }
+module.exports = { superTrendEmitter }

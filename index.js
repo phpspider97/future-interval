@@ -3,7 +3,7 @@ const http = require("http");
 const { Server } = require("socket.io");
 const path = require("path"); 
 const { futureEmitter } = require("./future/future"); 
-// const { optionEmitter } = require("./option/option"); 
+const { optionEmitter } = require("./option/option"); 
 // const { gridEmitter } = require("./grid/grid"); 
 // const { crossEmitter } = require("./cross/cross"); 
 // const { superTrendEmitter } = require("./super-trend/super-trend"); 
@@ -22,12 +22,12 @@ app.get('/', (req, res) => {
 //==============================FUTURE==================================
 
 //==============================OPTION==================================
-// optionEmitter.on("option_trade_info", (data) => { 
-//     io.emit("option_trade_info", data)
-// })  
-// app.get('/option', (req, res) => {  
-//     res.sendFile(path.join(__dirname, 'public', 'option.html'));
-// }) 
+optionEmitter.on("option_trade_info", (data) => { 
+    io.emit("option_trade_info", data)
+})  
+app.get('/option', (req, res) => {  
+    res.sendFile(path.join(__dirname, 'public', 'option.html'));
+}) 
 //==============================OPTION==================================
 
 //==============================GRID==================================
@@ -66,12 +66,12 @@ io.on("connection", (socket) => {
     socket.on("future_stop", () => { 
         futureEmitter.emit("future_stop")
     })
-    // socket.on("option_start", () => { 
-    //     optionEmitter.emit("option_start")
-    // })
-    // socket.on("option_stop", () => { 
-    //     optionEmitter.emit("option_stop")
-    // })
+    socket.on("option_start", () => { 
+        optionEmitter.emit("option_start")
+    })
+    socket.on("option_stop", () => { 
+        optionEmitter.emit("option_stop")
+    })
     // socket.on("grid_start", () => { 
     //     gridEmitter.emit("grid_start")
     // })

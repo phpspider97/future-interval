@@ -37,7 +37,7 @@ const KEY           =   process.env.FUTURE_WEB_KEY
 const SECRET        =   process.env.FUTURE_WEB_SECRET 
 const USER_ID       =   process.env.FUTURE_WEB_USER_ID
 
-let lot_size_array                  =    [1, 3, 9] 
+let lot_size_array                  =    [1, 1, 1] 
 let is_live                         =    false
 let LOSS_EXCEED_LIMIT               =    0 
 let bitcoin_product_id              =    0
@@ -81,13 +81,9 @@ function wsConnect() {
    
   async function onMessage(data) { 
     const message = JSON.parse(data)
-    if(message.type == 'error'){
-        sendEmail(message.message,`IP ADDRESS ERROR`)
-        console.log(message.message)
-    }
     if (message.type === 'success' && message.message === 'Authenticated') {
-      subscribe(ws, 'orders', ['all'])
-      subscribe(ws, 'v2/ticker', ['BTCUSD'])
+        subscribe(ws, 'orders', ['all'])
+        subscribe(ws, 'v2/ticker', ['BTCUSD'])
     } else {
         if(total_error_count>3) { 
             is_live = false
@@ -96,6 +92,10 @@ function wsConnect() {
         }    
         if(!is_live){
             return true
+        }
+        if(message.type == 'error'){
+            sendEmail(message.message,`IP ADDRESS ERROR`)
+            console.log(message.message)
         }
         if(message.type == "orders"){
             if(message.state == 'closed' && message.meta_data.pnl != undefined){  
@@ -150,9 +150,10 @@ function wsConnect() {
             }
             if(current_running_order == 'sell' && candle_current_price>border_buy_price){
                 console.log('') 
+                sendEmail('',`LOSS IN ORDER : LOT SIZE : ${lot_size_array[number_of_time_order_executed-1]} - ${current_running_order}`)
                 LOSS_EXCEED_LIMIT++
+                current_running_order = ''
                 await cancelAllOpenOrder()
-                sendEmail('',`LOSS IN ORDER : LOT SIZE : ${lot_size_array[number_of_time_order_executed-1]}`)
             }
 
             if(current_running_order == '' && candle_current_price>border_buy_price){
@@ -163,9 +164,10 @@ function wsConnect() {
 
             if(current_running_order == 'buy' && candle_current_price<border_sell_price){
                 console.log('') 
+                sendEmail('',`LOSS IN ORDER : LOT SIZE : ${lot_size_array[number_of_time_order_executed-1]} - ${current_running_order} `)
                 LOSS_EXCEED_LIMIT++
+                current_running_order = ''
                 await cancelAllOpenOrder()
-                sendEmail('',`LOSS IN ORDER : LOT SIZE : ${lot_size_array[number_of_time_order_executed-1]}`)
             }
 
             if(current_running_order == '' && candle_current_price<border_sell_price){
@@ -178,7 +180,7 @@ function wsConnect() {
                 is_break_time = true 
                 LOSS_EXCEED_LIMIT = 0
                 if(current_running_order != ''){
-                    sendEmail('',`PROFIT IN ORDER : LOT SIZE : ${lot_size_array[number_of_time_order_executed-1]}`)
+                    sendEmail('',`PROFIT IN ORDER : LOT SIZE : ${lot_size_array[number_of_time_order_executed-1]} - ${current_running_order}`)
                 }
                 await cancelAllOpenOrder()
                 await resetLoop()
@@ -283,13 +285,13 @@ async function cancelAllOpenOrder() {
 
 async function createOrder(bidType,bitcoin_current_price) {
     try { 
-        let current_trend = await findCandleTrend() 
-        if(bidType == 'sell' && (current_trend == 'neutral' || current_trend == 'bull') ){
-            return true
-        }
-        if(bidType == 'buy' && (current_trend == 'neutral' || current_trend == 'bear') ){
-            return true
-        } 
+        // let current_trend = await findCandleTrend() 
+        // if(bidType == 'sell' && (current_trend == 'neutral' || current_trend == 'bull') ){
+        //     return true
+        // }
+        // if(bidType == 'buy' && (current_trend == 'neutral' || current_trend == 'bear') ){
+        //     return true
+        // } 
         if(number_of_time_order_executed > lot_size_array.length-1){
             number_of_time_order_executed = 0 
         }   
@@ -312,7 +314,7 @@ async function createOrder(bidType,bitcoin_current_price) {
             side: bidType,   
             order_type: "market_order", 
         };
-        console.log('bodyParams', bitcoin_current_price, bodyParams)
+        //console.log('bodyParams', bitcoin_current_price, bodyParams)
         const signaturePayload = `POST${timestamp}/v2/orders${JSON.stringify(bodyParams)}`;
         const signature = await generateEncryptSignature(signaturePayload);
 

@@ -87,11 +87,13 @@ function wsConnect() {
                 console.log(message.message)
             }
             if(total_error_count > 3) { 
+                console.log('total_error_count',is_live)
                 is_live = false
                 fs.writeFileSync('./grid/orderInfo.json', '', 'utf8')
                 ws.close(1000, 'Too many errors');
             }     
             if(!is_live){
+                console.log('socket_is_live',is_live)
                 return true
             } 
             if(message.type == "orders"){

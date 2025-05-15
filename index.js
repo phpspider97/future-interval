@@ -4,7 +4,7 @@ const { Server } = require("socket.io");
 const path = require("path"); 
 const { futureEmitter } = require("./future/future"); 
 const { optionEmitter } = require("./option/option"); 
-// const { gridEmitter } = require("./grid/grid"); 
+const { gridEmitter } = require("./grid/grid"); 
 // const { crossEmitter } = require("./cross/cross"); 
 // const { superTrendEmitter } = require("./super-trend/super-trend"); 
  
@@ -31,12 +31,12 @@ app.get('/option', (req, res) => {
 //==============================OPTION==================================
 
 //==============================GRID==================================
-// gridEmitter.on("grid_trade_info", (data) => { 
-//     io.emit("grid_trade_info", data)
-// })  
-// app.get('/grid', (req, res) => {  
-//     res.sendFile(path.join(__dirname, 'public', 'grid.html'));
-// }) 
+gridEmitter.on("grid_trade_info", (data) => { 
+    io.emit("grid_trade_info", data)
+})  
+app.get('/grid', (req, res) => {  
+    res.sendFile(path.join(__dirname, 'public', 'grid.html'));
+}) 
 //==============================GRID==================================
 
 //==============================CROSS==================================
@@ -72,12 +72,12 @@ io.on("connection", (socket) => {
     socket.on("option_stop", () => { 
         optionEmitter.emit("option_stop")
     })
-    // socket.on("grid_start", () => { 
-    //     gridEmitter.emit("grid_start")
-    // })
-    // socket.on("grid_stop", () => { 
-    //     gridEmitter.emit("grid_stop")
-    // })
+    socket.on("grid_start", () => { 
+        gridEmitter.emit("grid_start")
+    })
+    socket.on("grid_stop", () => { 
+        gridEmitter.emit("grid_stop")
+    })
     // socket.on("cross_start", () => { 
     //     crossEmitter.emit("cross_start")
     // })

@@ -17,6 +17,9 @@ let transporter = nodemailer.createTransport({
     },
 }) 
 function sendEmail(message,subject){
+    if(!is_live){
+        return false
+    }
     let mailOptions = {
         from: 'phpspider97@gmail.com',
         to: 'neelbhardwaj97@gmail.com',

@@ -1,3 +1,9 @@
 {
-    "ignore": ["cross/orderInfo.json","super-trend/orderInfo.json"]
+    "ignore": [
+        "cross/orderInfo.json",
+        "future/orderInfo.json",
+        "option/orderInfo.json",
+        "grid/orderInfo.json",
+        "super-trend/orderInfo.json"
+    ]
 }  

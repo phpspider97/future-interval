@@ -1,150 +1,180 @@
-const axios = require('axios');
-const crypto = require('crypto');
-require('dotenv').config();
-const WebSocket = require('ws'); 
-const api_url = process.env.API_URL 
-const socket_url = process.env.API_URL_SOCKET 
-const key = process.env.GRID_WEB_KEY
-const secret = process.env.GRID_WEB_SECRET 
+const axios = require('axios')
+const crypto = require('crypto')
+require('dotenv').config()
+const WebSocket = require('ws')
 const fs = require('fs')
 const { classifyLastCandle } = require('./trend.js')
+const nodemailer = require('nodemailer')
 
-const EventEmitter = require('events');
-const gridEmitter = new EventEmitter();
+const EventEmitter = require('events')
+const gridEmitter = new EventEmitter()
 
-let is_live = false
+let transporter = nodemailer.createTransport({
+  service: 'gmail',
+  auth: {
+    user: process.env.USER_EMAIL,
+    pass: process.env.USER_PASSWORD
+  },
+}) 
+function sendEmail(message,subject){
+    if(!is_live){
+        return false
+    }
+    let mailOptions = {
+        from: 'phpspider97@gmail.com',
+        to: 'neelbhardwaj97@gmail.com',
+        subject: 'GRID BOT : ' +subject,
+        html: message
+    }
+    transporter.sendMail(mailOptions, (error, info) => {
+        if (error) {
+            return console.log('Error:', error);
+        }
+        console.log('Email sent:', info.response);
+    });
+}
 
-let reconnectInterval = 2000; 
+const API_URL       =   process.env.API_URL 
+const SOCKET_URL    =   process.env.API_URL_SOCKET 
+const KEY           =   process.env.GRID_WEB_KEY
+const SECRET        =   process.env.GRID_WEB_SECRET 
+const USER_ID       =   process.env.GRID_WEB_USER_ID
+
+let is_live                         =   false
+let given_price_range               =   []
+let lower_price                     =   0 
+let upper_price                     =   0 
+let grid_spacing                    =   0
+let numberOfGrids                   =   11
+let profit_margin                   =   100
+let total_error_count               =   0 
+let number_of_time_order_executed   =   0
+let roundedToHundred                =   (price) => Math.round(price / 100) * 100
+let reconnectInterval               =   2000
+let order_in_progress               =    false 
+
 function wsConnect() { 
-  const WEBSOCKET_URL = socket_url;
-  const API_KEY = key;
-  const API_SECRET = secret;
-
-  // Generate HMAC SHA256 signature
-  function generateSignature(secret, message) {
-    return crypto.createHmac('sha256', secret).update(message).digest('hex');
-  }
-
-  // Subscribe to a specific channel with given symbols
-  function subscribe(ws, channel, symbols) {
-    const payload = {
-      type: 'subscribe',
-      payload: {
-        channels: [
-          {
-            name: channel,
-            symbols: symbols
-          }
-        ]
-      }
-    };
-    ws.send(JSON.stringify(payload));
-  }
-   
-  async function onMessage(data) {
-    const message = JSON.parse(data)
-    //console.log('message___',message)
-    if (message.type === 'success' && message.message === 'Authenticated') {
-      subscribe(ws, 'orders', ['all']);
-      subscribe(ws, 'v2/ticker', ['BTCUSD']);
-      subscribe(ws, 'l2_orderbook', ['BTCUSD']); 
-    } else {
-        if(total_error_count>5) { 
-            ws.close(1000, 'Too many errors');
-        } 
-        if(!is_live){
-          return true
-        }
-        if(message.type == "orders"){
-            if(message.state == 'closed' && message.meta_data.pnl != undefined){ 
-                console.log('given_price_range___',given_price_range.length, given_price_range)
-                const side = message.side
-                const order_at = parseInt(message.limit_price)
-   
-                const update_order_price = (side == 'buy')?order_at+profitMargin:order_at-profitMargin 
-                await createOrder((side == 'buy')?'sell':'buy',update_order_price,message.average_fill_price,true)              
+    const WEBSOCKET_URL = SOCKET_URL
+    const API_KEY = KEY
+    const API_SECRET = SECRET
+    
+    function generateSignature(secret, message) {
+        return crypto.createHmac('sha256', secret).update(message).digest('hex');
+    }
+    function subscribe(ws, channel, symbols) {
+        const payload = {
+        type: 'subscribe',
+        payload: {
+            channels: [
+            {
+                name: channel,
+                symbols: symbols
             }
+            ]
         }
+        };
+        ws.send(JSON.stringify(payload));
+    }
+    async function onMessage(data) {
+        const message = JSON.parse(data) 
+        if (message.type === 'success' && message.message === 'Authenticated') {
+            subscribe(ws, 'orders', ['all'])
+            subscribe(ws, 'v2/ticker', ['BTCUSD'])
+            subscribe(ws, 'l2_orderbook', ['BTCUSD']) 
+        } else {
+            if(total_error_count > 3) { 
+                is_live = false
+                fs.writeFileSync('./grid/orderInfo.json', '', 'utf8')
+                ws.close(1000, 'Too many errors');
+            }    
+            if(!is_live){
+                return true
+            }
+            if(message.type == 'error'){
+                sendEmail(message.message,`IP ADDRESS ERROR`)
+                console.log(message.message)
+            }
+            if(message.type == "orders"){
+                if(message.state == 'closed' && message.meta_data.pnl != undefined){  
+                    const side = message.side
+                    const order_at = parseInt(message.limit_price)
+    
+                    const update_order_price = (side == 'buy')?order_at+profit_margin:order_at-profit_margin 
+                    await createOrder((side == 'buy')?'sell':'buy',update_order_price)
 
-        if(message.type == "v2/ticker"){
-            if (message?.close > upperPrice+profitMargin || message?.close < lowerPrice-profitMargin) { 
-                await cancelAllOpenOrder()
-                setTimeout(async () => {
-                    await getCurrentPriceOfBitcoin()
-                }, 600000);
+                    sendEmail('',`ONE ${side} SIDE STOP ORDER TRIGGERED AT ${order_at}`)
+                }
+            }
+            if(message.type == "v2/ticker"){
+                let candle_current_price = message?.close
+                if (candle_current_price > upper_price+profit_margin || candle_current_price < lower_price-profit_margin) {
+                    sendEmail('',`PRICE OUT OF THE GRID NOW GRID STOP FOR 10 MINUTE`)
+                    await cancelAllOpenOrder()
+                    setTimeout(async () => {
+                        sendEmail('',`GRID CREATE AGAIN AFTER 10 MINUTE`)
+                        await setRangeLimitOrder()
+                    }, 600000) // 10 min
+                }
+                triggerOrder(candle_current_price)
             } 
-            triggerOrder(message?.close)
         } 
     } 
-  } 
-  async function onError(error) {
-    await cancelAllOpenOrder()
-    console.error('Socket Error:', error.message);
-  }
-
-  async function onClose(code, reason) {
-    console.log(`Socket closed with code: ${code}, reason: ${reason}`)
-    
-    if(code == 1000){
-      console.log('cancle all order')
-      await cancelAllOpenOrder()
-
-      setTimeout(() => { // connect again after 1 minute
-        total_error_count = 0
-        console.log('Reconnecting after long time...')
-        wsConnect(); 
-      }, 60000);
-
-    }else{
-      total_error_count = 0
-      setTimeout(() => {
-        console.log('Reconnecting...')
-        wsConnect();
-      }, reconnectInterval);
+    async function onError(error) {
+        await cancelAllOpenOrder()
+        sendEmail(error.message??'',`SOCKET DEFAULT ERROR TRIGGERED`)
+        setTimeout(() => {
+            sendEmail('',`SOCKET RE-CONNECT AGAIN AFTER 2 SECONDS CLOSED DUE TO SOCKET DEFAULT ERROR TRIGGERED`)
+            wsConnect()
+        }, reconnectInterval)
     }
-  }
-  
-  function sendAuthentication(ws) {
-    const method = 'GET';
-    const path = '/live';
-    const timestamp = Math.floor(Date.now() / 1000).toString(); // Unix timestamp in seconds
-    const signatureData = method + timestamp + path;
-    const signature = generateSignature(API_SECRET, signatureData);
 
-    const authPayload = {
-      type: 'auth',
-      payload: {
-        'api-key': API_KEY,
-        signature: signature,
-        timestamp: timestamp
-      }
-    };
-
-    ws.send(JSON.stringify(authPayload));
-  }
-
-  // Initialize WebSocket connection
-  const ws = new WebSocket(WEBSOCKET_URL);
-  ws.on('open', () => {
-    console.log('Socket opened');
-    sendAuthentication(ws);
-  });
-  ws.on('message', onMessage);
-  ws.on('error', onError);
-  ws.on('close', onClose);
+    async function onClose(code, reason) {
+        console.log(`Socket closed with code: ${code}, reason: ${reason}`)
+        if(code == 1000){
+            sendEmail(reason.toString(),`SOCKET CLOSED DUE TO TOO MANY ERROR`)
+            await cancelAllOpenOrder()
+            setTimeout(() => {
+                total_error_count = 0 
+                sendEmail('',`SOCKET RE-CONNECT AGAIN AFTER 1 MINUTE CLOSED DUE TO TOO MANY ERROR`)
+                wsConnect()
+                resetLoop()
+            }, 60000)
+        }else{
+            total_error_count = 0
+            sendEmail(reason.toString(),`SOCKET UNEXPECTED ERROR`)
+            setTimeout(() => {
+                sendEmail('',`SOCKET RE-CONNECT AGAIN AFTER 2 SECONDS CLOSED DUE TO SOCKET UNEXPECTED ERROR`)
+                wsConnect()
+            }, reconnectInterval)
+        }
+    }
+    function sendAuthentication(ws) {
+        const method = 'GET'
+        const path = '/live'
+        const timestamp = Math.floor(Date.now() / 1000).toString(); // Unix timestamp in seconds
+        const signatureData = method + timestamp + path
+        const signature = generateSignature(API_SECRET, signatureData)
+        const authPayload = {
+            type: 'auth',
+            payload: {
+                'api-key': API_KEY,
+                signature: signature,
+                timestamp: timestamp
+            }
+        }
+        ws.send(JSON.stringify(authPayload))
+    }
+    
+    const ws = new WebSocket(WEBSOCKET_URL)
+    ws.on('open', () => {
+        console.log('Socket opened')
+        sendAuthentication(ws)
+    })
+    ws.on('message', onMessage)
+    ws.on('error', onError)
+    ws.on('close', onClose)
 }
-wsConnect();
-
-let given_price_range       =   []
-let lowerPrice              =   0 
-let upperPrice              =   0 
-let gridSpacing             =   0
-let numberOfGrids           =   11
-let profitMargin            =   100
-let total_error_count       =   0 
-let number_of_time_order_executed = 0
-
-const roundedToHundred = (price) => Math.round(price / 100) * 100;
+wsConnect()
  
 async function cancelAllOpenOrder() {
     try {
@@ -153,41 +183,43 @@ async function cancelAllOpenOrder() {
         const bodyParams = {
             close_all_portfolio: true,
             close_all_isolated: true,
-            user_id: process.env.GRID_WEB_USER_ID,
+            user_id: USER_ID,
         }; 
         const signaturePayload = `POST${timestamp}/v2/positions/close_all${JSON.stringify(bodyParams)}`;
         const signature = await generateEncryptSignature(signaturePayload);
 
         const headers = {
-            "api-key": key,
+            "api-key": KEY,
             "signature": signature,
             "timestamp": timestamp,
             "Content-Type": "application/json",
             "Accept": "application/json",
         }; 
-        const response = await axios.post(`${api_url}/v2/positions/close_all`, bodyParams, { headers });
+        const response = await axios.post(`${API_URL}/v2/positions/close_all`, bodyParams, { headers });
         return { data: response.data, status: true };
     } catch (error) {
-        console.log('error.message___1_',error.response.data)
-        project_error_message = JSON.stringify(error.response.data)
-        botRunning = false
+        sendEmail(error.message,`ERROR IN WHEN CANCEL ALL ORDER`)
         return { message: error.message, status: false };
     }
 }
 
-async function getCurrentPriceOfBitcoin() {
+function sleep(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+async function setRangeLimitOrder() {
     try {
         await cancelAllOpenOrder()
-        const response = await axios.get(`${api_url}/v2/tickers/BTCUSD`);
+        const response = await axios.get(`${API_URL}/v2/tickers/BTCUSD`);
         const current_price = Math.round(response.data.result.close);  
         bitcoin_product_id = response.data.result.product_id;
         let round_of_current_price = roundedToHundred(current_price)
-        upperPrice       =  round_of_current_price + 600
-        lowerPrice       =  round_of_current_price - 500
-        gridSpacing      = (upperPrice - lowerPrice) / numberOfGrids;
+        upper_price       =  round_of_current_price + 600
+        lower_price       =  round_of_current_price - 500
+        grid_spacing      =  (upper_price - lower_price) / numberOfGrids;
         
         for (let i = 0; i < numberOfGrids; i++) {
-            const rawBuyPrice = lowerPrice + i * gridSpacing;  
+            const rawBuyPrice = lower_price + i * grid_spacing;  
             given_price_range.push({
                 price : rawBuyPrice,
                 fill : {
@@ -197,93 +229,100 @@ async function getCurrentPriceOfBitcoin() {
             }); 
         }
  
-        const first_five = given_price_range.slice(0, 5);
-        const last_five = given_price_range.slice(-5);
+        const first_five = given_price_range.slice(0, 5)
+        const last_five = given_price_range.slice(-5)
 
         first_five.forEach(async (data)=>{
-            await createOrder('buy',data.price,current_price,true)
+            order_in_progress = false
+            await createOrder('buy',data.price)
+            await sleep(500)
         })
         last_five.forEach(async (data)=>{
-            await createOrder('sell',data.price,current_price,true)
+            order_in_progress = false
+            await createOrder('sell',data.price)
+            await sleep(500)
         })
-        
+         
         updateOrderInfo(JSON.stringify({
             bitcoin_product_id,
-            upperPrice,
-            lowerPrice,
-            gridSpacing,
+            upper_price,
+            lower_price,
+            grid_spacing,
         }))
-        console.log('current_price___',current_price)
-        console.log('given_price_range___',given_price_range.length, given_price_range)
+        //console.log('current_price___',current_price)
+        //console.log('given_price_range___',given_price_range.length, given_price_range)
     } catch (error) {
+        sendEmail(error.message,`ERROR IN WHEN CANCEL ALL ORDER`)
         return { message: error.message, status: false };
     }
 }
 
 async function generateEncryptSignature(signaturePayload) { 
-    return crypto.createHmac("sha256", secret).update(signaturePayload).digest("hex");
+    return crypto.createHmac("sha256", SECRET).update(signaturePayload).digest("hex");
 }
-async function createOrder(bidType,order_price,currentPrice,status){
-    if(total_error_count>5){
+async function createOrder(bid_type,order_price){
+    if(total_error_count>3){
         return true
     } 
+    if (order_in_progress){ 
+        return true
+    }
+    order_in_progress = true
     try { 
         const timestamp = Math.floor(Date.now() / 1000);
         const bodyParams = {
             product_id : bitcoin_product_id,
             product_symbol : "BTCUSD",
             size : 1, 
-            side : bidType,   
+            side : bid_type,   
             order_type : "limit_order",
-            limit_price : order_price,
-            //stop_trigger_method : "mark_price"
-        };
-
-        //console.log('order_params : ',currentPrice,  bodyParams)
+            limit_price : order_price
+        } 
         const signaturePayload = `POST${timestamp}/v2/orders${JSON.stringify(bodyParams)}`;
         const signature = await generateEncryptSignature(signaturePayload);
 
         const headers = {
-            "api-key": key,
+            "api-key": KEY,
             "signature": signature,
             "timestamp": timestamp,
             "Content-Type": "application/json",
             "Accept": "application/json",
-        };
-        const response = await axios.post(`${api_url}/v2/orders`, bodyParams, { headers }); 
+        }
+
+        const response = await axios.post(`${API_URL}/v2/orders`, bodyParams, { headers })
         if (response.data.success) { 
             number_of_time_order_executed++  
             return { data: response.data, status: true }
         }
         return { message: "Order failed", status: false }
     } catch (error) {
-        console.log('create_order_error_message____', error.response?.data || error.message)
+        sendEmail(error.message,`ERROR IN WHEN CREATING ORDER`) 
         total_error_count++ 
-        return { message: error?.message, status: false };
+        order_in_progress = false;  
+        return { message: error?.message, status: false }
     } finally {
-        orderInProgress = false;
+        order_in_progress = false;
     }
 }
 
-
 async function getBalance() {
-  try {   
-      const timestamp = Math.floor(Date.now() / 1000)
-      const signaturePayload = `GET${timestamp}/v2/wallet/balances`;
-      const signature = await generateEncryptSignature(signaturePayload);
+    try {   
+        const timestamp = Math.floor(Date.now() / 1000)
+        const signaturePayload = `GET${timestamp}/v2/wallet/balances`;
+        const signature = await generateEncryptSignature(signaturePayload);
 
-      const headers = {
-          "api-key": key,
-          "signature": signature,
-          "timestamp": timestamp,
-          "Content-Type": "application/json",
-          "Accept": "application/json",
-      }; 
-      const response = await axios.get(`${api_url}/v2/wallet/balances`, { headers })
-      return response.data.result[0].balance_inr
-  } catch (err) {
-      console.log('err__',err)
-  }
+        const headers = {
+            "api-key": KEY,
+            "signature": signature,
+            "timestamp": timestamp,
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+        }; 
+        const response = await axios.get(`${API_URL}/v2/wallet/balances`, { headers })
+        return response.data.result[0].balance_inr
+    } catch (error) {
+        sendEmail(error.message,`ERROR IN WHEN GET BALANCE`)
+    }
 }
 
 (function() { 
@@ -293,60 +332,62 @@ async function getBalance() {
       order_data = JSON.parse(order_data) 
 
       bitcoin_product_id = order_data.bitcoin_product_id
-      upperPrice = order_data.upperPrice
+      upper_price = order_data.upper_price
       border_buy_price = order_data.border_buy_price
-      lowerPrice = order_data.lowerPrice 
-      gridSpacing = order_data.gridSpacing 
+      lower_price = order_data.lower_price 
+      grid_spacing = order_data.grid_spacing 
   }
 })();
 
 async function updateOrderInfo(content){
-  fs.writeFile('./grid/orderInfo.json', content, (err) => {
-      if (err) {
-          console.error('Error writing file:', err);
-      } else {
-          console.log('File created and text written successfully.');
-      }
-  });
+    fs.writeFile('./grid/orderInfo.json', content, (error) => {
+        if (error) {
+            sendEmail(JSON.stringify(error),`ERROR IN WHEN UPDATE ORDER FILE`)
+        } else {
+            console.log('File created and text written successfully.')
+        }
+    });
 }
 async function socketEventInfo(current_price){
-  let order_data = {}
-  let current_balance = await getBalance() 
-  is_live = (fs.statSync('./grid/orderInfo.json').size != 0)?true:false
-  if(is_live){
+    let order_data = {}
+    let current_balance = await getBalance() 
+    is_live = (fs.statSync('./grid/orderInfo.json').size != 0)?true:false
+    if(is_live){
         order_data = fs.readFileSync('./grid/orderInfo.json', 'utf8')
-      order_data = JSON.parse(order_data) 
-  }
-    
-  let current_trend = await classifyLastCandle()
-  gridEmitter.emit("grid_trade_info", {
-      balance : current_balance,
-      product_symbol : "BTCUSD",
-      bitcoin_product_id : order_data.bitcoin_product_id??0,
-      current_price : current_price??0,
-      upperPrice,
-      lowerPrice,
-      gridSpacing,
-      is_live : is_live,
-      current_trend
-  })
+        order_data = JSON.parse(order_data) 
+    }
+        
+    let current_trend = await classifyLastCandle()
+    gridEmitter.emit("grid_trade_info", {
+        balance : current_balance,
+        product_symbol : "BTCUSD",
+        bitcoin_product_id : order_data.bitcoin_product_id??0,
+        current_price : current_price??0,
+        upper_price,
+        lower_price,
+        grid_spacing,
+        is_live : is_live,
+        current_trend
+    })
 }
 async function triggerOrder(current_price) {
-  try{
-      socketEventInfo(current_price)
-  }catch(error){ 
-      console.log('error____',error)
-  }
+    try{
+        socketEventInfo(current_price)
+    }catch(error){ 
+        sendEmail(error.message,`ERROR IN WHEN GET PRODUCT INFORMATION BY SOCKET`)
+    }
 }
 
 gridEmitter.on("grid_start", () => { 
-    getCurrentPriceOfBitcoin()
+    setRangeLimitOrder()
+    sendEmail('',`BOT START BUTTON PRESSED`)
 })
 
 gridEmitter.on("grid_stop", async () => { 
-  await cancelAllOpenOrder() 
-  fs.writeFileSync('./grid/orderInfo.json', '', 'utf8')
-  is_live = false 
+    await cancelAllOpenOrder() 
+    fs.writeFileSync('./grid/orderInfo.json', '', 'utf8')
+    is_live = false 
+    sendEmail('',`BOT STOP BUTTON PRESSED`)
 })
 
 module.exports = { gridEmitter }

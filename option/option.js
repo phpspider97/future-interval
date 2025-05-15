@@ -18,16 +18,18 @@ let transporter = nodemailer.createTransport({
 })
 
 function sendEmail(message,subject){
+    if(!is_live){
+        return false
+    }
     let mailOptions = {
         from: 'phpspider97@gmail.com',
         to: 'neelbhardwaj97@gmail.com',
         subject: 'OPTION BOT : ' +subject,
         html: message
-    };
-    
+    } 
     transporter.sendMail(mailOptions, (error, info) => {
         if (error) {
-            return console.log('Error:', error);
+            console.log('Error:', error);
         }
         console.log('Email sent:', info.response);
     });
@@ -103,8 +105,9 @@ function wsConnect() {
             let candle_current_price = message?.spot_price
             if(is_break_time == true){
                 return true
-            }
+            } 
             if(current_running_order == 'sell' && candle_current_price < border_sell_price){ 
+                console.log('1_loss__lot_size_array___',lot_size_array,number_of_time_order_executed)
                 sendEmail('',`LOSS IN ORDER : LOT SIZE : ${lot_size_array[number_of_time_order_executed-1]} - ${current_running_order}`)
                 current_running_order = 'buy'
                 bitcoin_current_price = candle_current_price 
@@ -116,6 +119,7 @@ function wsConnect() {
             }
 
             if(current_running_order == 'buy' && candle_current_price>border_buy_price){ 
+                console.log('2_loss__lot_size_array___',lot_size_array,number_of_time_order_executed)
                 sendEmail('',`LOSS IN ORDER : LOT SIZE : ${lot_size_array[number_of_time_order_executed-1]} - ${current_running_order}`)
                 current_running_order = 'sell'
                 bitcoin_current_price = candle_current_price
@@ -127,6 +131,7 @@ function wsConnect() {
             }
               
             if (candle_current_price > border_buy_profit_price+additional_profit_buy_price || candle_current_price < border_sell_profit_price) {  
+                console.log('profite__lot_size_array___',lot_size_array,number_of_time_order_executed)
                 sendEmail('',`PROFIT IN ORDER : LOT SIZE : ${lot_size_array[number_of_time_order_executed-1]} - ${current_running_order}`) 
                 is_break_time = true 
                 LOSS_EXCEED_LIMIT = 0
@@ -134,7 +139,6 @@ function wsConnect() {
                 await cancelAllOpenOrder()
                 await resetLoop()
             } 
-
             await triggerOrder(candle_current_price)
         } 
     }
@@ -261,23 +265,22 @@ async function createOrder(product_id,bitcoin_option_symbol) {
     try { 
         const timestamp = Math.floor(Date.now() / 1000);
         const bodyParams = {
-        product_id: product_id, 
-        product_symbol: bitcoin_option_symbol, 
-        size: lot_size_array[number_of_time_order_executed],
-        side: 'sell', 
-        order_type: "market_order"
+            product_id: product_id, 
+            product_symbol: bitcoin_option_symbol, 
+            size: lot_size_array[number_of_time_order_executed],
+            side: 'sell', 
+            order_type: "market_order"
         }
-
-        //console.log('order_bodyParams___', lot_size_array,number_of_time_order_executed, bodyParams)
+ 
         const signaturePayload = `POST${timestamp}/v2/orders${JSON.stringify(bodyParams)}`;
         const signature = await generateEncryptSignature(signaturePayload);
 
         const headers = {
-        "api-key": KEY,
-        "signature": signature,
-        "timestamp": timestamp,
-        "Content-Type": "application/json",
-        "Accept": "application/json",
+            "api-key": KEY,
+            "signature": signature,
+            "timestamp": timestamp,
+            "Content-Type": "application/json",
+            "Accept": "application/json",
         };
         const response = await axios.post(`${API_URL}/v2/orders`, bodyParams, { headers });
         if (response.data.success) { 
@@ -313,7 +316,7 @@ async function createOrder(product_id,bitcoin_option_symbol) {
                     </tr>`:``
                 }
             </table>
-            `
+            ` 
             sendEmail(message_template,`CREATE ORDER : ${bitcoin_option_symbol}`)
             number_of_time_order_executed++
             return { data: response.data, status: true }

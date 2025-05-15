@@ -88,6 +88,10 @@ function wsConnect() {
         subscribe(ws, 'orders', ['all'])
         subscribe(ws, 'v2/ticker', ['BTCUSD'])
     } else {
+        if(message.type == 'error'){
+            sendEmail(message.message,`IP ADDRESS ERROR`)
+            console.log(message.message)
+        }
         if(total_error_count>3) { 
             is_live = false
             fs.writeFileSync('./future/orderInfo.json', '', 'utf8')
@@ -95,10 +99,6 @@ function wsConnect() {
         }    
         if(!is_live){
             return true
-        }
-        if(message.type == 'error'){
-            sendEmail(message.message,`IP ADDRESS ERROR`)
-            console.log(message.message)
         }
         if(message.type == "orders"){
             if(message.state == 'closed' && message.meta_data.pnl != undefined){  

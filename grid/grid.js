@@ -90,7 +90,7 @@ function wsConnect() {
                 is_live = false
                 fs.writeFileSync('./grid/orderInfo.json', '', 'utf8')
                 ws.close(1000, 'Too many errors');
-            }    
+            }     
             if(!is_live){
                 return true
             } 
@@ -330,7 +330,7 @@ async function getBalance() {
   if(is_live){
       let order_data = fs.readFileSync('./grid/orderInfo.json', 'utf8')
       order_data = JSON.parse(order_data) 
-
+    
       bitcoin_product_id = order_data.bitcoin_product_id
       upper_price = order_data.upper_price
       border_buy_price = order_data.border_buy_price
@@ -355,8 +355,7 @@ async function socketEventInfo(current_price){
     if(is_live){
         order_data = fs.readFileSync('./grid/orderInfo.json', 'utf8')
         order_data = JSON.parse(order_data) 
-    }
-        
+    } 
     let current_trend = await classifyLastCandle()
     gridEmitter.emit("grid_trade_info", {
         balance : current_balance,
@@ -378,8 +377,9 @@ async function triggerOrder(current_price) {
     }
 }
 
-gridEmitter.on("grid_start", () => { 
-    setRangeLimitOrder()
+gridEmitter.on("grid_start", async () => { 
+    await setRangeLimitOrder()
+    is_live = true 
     sendEmail('',`BOT START BUTTON PRESSED`)
 })
 

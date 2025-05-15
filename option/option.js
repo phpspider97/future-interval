@@ -493,6 +493,7 @@ async function triggerOrder(current_price) {
 
 optionEmitter.on("option_start", () => {  
     init() 
+    is_live = true 
     sendEmail('',`BOT START BUTTON PRESSED`)
 })
 

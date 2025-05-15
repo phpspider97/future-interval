@@ -519,6 +519,7 @@ async function triggerOrder(current_price) {
 
 futureEmitter.on("future_start", () => { 
     init() 
+    is_live = true 
     sendEmail('',`BOT START BUTTON PRESSED`)
 })
 

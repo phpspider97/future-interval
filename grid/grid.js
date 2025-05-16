@@ -82,7 +82,7 @@ function wsConnect() {
         } else {
             if(message.type == 'error'){
                 sendEmail(message.message,`IP ADDRESS ERROR`)
-                console.log(message.message)
+                console.log("GRID : " + message.message)
             }
             if(!is_live){ 
                 return true
@@ -175,7 +175,6 @@ function wsConnect() {
     ws.on('error', onError)
     ws.on('close', onClose)
 }
-wsConnect()
  
 async function cancelAllOpenOrder() {
     try {
@@ -249,9 +248,7 @@ async function setRangeLimitOrder() {
             upper_price,
             lower_price,
             grid_spacing,
-        }))
-        //console.log('current_price___',current_price)
-        //console.log('given_price_range___',given_price_range.length, given_price_range)
+        })) 
     } catch (error) {
         sendEmail(error.message,`ERROR IN WHEN CANCEL ALL ORDER`)
         return { message: error.message, status: false };
@@ -329,6 +326,7 @@ async function getBalance() {
 (function() { 
     is_live = (fs.statSync('./grid/orderInfo.json').size != 0)?true:false
     if(is_live){
+        wsConnect()
         let order_data = fs.readFileSync('./grid/orderInfo.json', 'utf8')
         order_data = JSON.parse(order_data) 
         
@@ -381,6 +379,7 @@ async function triggerOrder(current_price) {
 gridEmitter.on("grid_start", async () => { 
     await setRangeLimitOrder()
     is_live = true 
+    wsConnect()
     sendEmail('',`BOT START BUTTON PRESSED`)
 })
 

@@ -89,7 +89,7 @@ function wsConnect() {
     } else {
         if(message.type == 'error'){
             sendEmail(message.message,`IP ADDRESS ERROR`)
-            console.log(message.message)
+            console.log("OPTION : " + message.message)
         }
         if(!is_live){
             return true
@@ -104,8 +104,7 @@ function wsConnect() {
             if(is_break_time == true){
                 return true
             } 
-            if(current_running_order == 'sell' && candle_current_price < border_sell_price){ 
-                console.log('1_loss__lot_size_array___',lot_size_array,number_of_time_order_executed)
+            if(current_running_order == 'sell' && candle_current_price < border_sell_price){  
                 sendEmail('',`LOSS IN ORDER : LOT SIZE : ${lot_size_array[number_of_time_order_executed-1]} - ${current_running_order}`)
                 current_running_order = 'buy'
                 bitcoin_current_price = candle_current_price 
@@ -116,8 +115,7 @@ function wsConnect() {
                 await createOrder(result?.data?.option_data?.product_id,result?.data?.option_data?.symbol)
             }
 
-            if(current_running_order == 'buy' && candle_current_price>border_buy_price){ 
-                console.log('2_loss__lot_size_array___',lot_size_array,number_of_time_order_executed)
+            if(current_running_order == 'buy' && candle_current_price>border_buy_price){  
                 sendEmail('',`LOSS IN ORDER : LOT SIZE : ${lot_size_array[number_of_time_order_executed-1]} - ${current_running_order}`)
                 current_running_order = 'sell'
                 bitcoin_current_price = candle_current_price
@@ -128,8 +126,7 @@ function wsConnect() {
                 await createOrder(result?.data?.option_data?.product_id,result?.data?.option_data?.symbol)
             }
               
-            if (candle_current_price > border_buy_profit_price+additional_profit_buy_price || candle_current_price < border_sell_profit_price) {  
-                console.log('profite__lot_size_array___',lot_size_array,number_of_time_order_executed)
+            if (candle_current_price > border_buy_profit_price+additional_profit_buy_price || candle_current_price < border_sell_profit_price) {   
                 sendEmail('',`PROFIT IN ORDER : LOT SIZE : ${lot_size_array[number_of_time_order_executed-1]} - ${current_running_order}`) 
                 is_break_time = true 
                 LOSS_EXCEED_LIMIT = 0
@@ -205,8 +202,6 @@ function wsConnect() {
   ws.on('error', onError);
   ws.on('close', onClose);
 }
-wsConnect();
-
 
 async function generateEncryptSignature(signaturePayload) { 
   return crypto.createHmac("sha256", SECRET).update(signaturePayload).digest("hex");
@@ -437,6 +432,7 @@ async function getCurrentPriceOfBitcoin(data_type) {
 (function() { 
     is_live = (fs.statSync('./option/orderInfo.json').size != 0)?true:false
     if(is_live){
+        wsConnect()
         let order_data = fs.readFileSync('./option/orderInfo.json', 'utf8')
         order_data = JSON.parse(order_data) 
         bitcoin_product_id = order_data.bitcoin_product_id 
@@ -492,6 +488,7 @@ async function triggerOrder(current_price) {
 optionEmitter.on("option_start", () => {  
     init() 
     is_live = true 
+    wsConnect()
     sendEmail('',`BOT START BUTTON PRESSED`)
 })
 

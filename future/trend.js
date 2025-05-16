@@ -3,11 +3,11 @@ const { EMA, RSI, MACD } = require('technicalindicators')
 require('dotenv').config()
 const api_url = process.env.API_URL 
 const SYMBOL = 'BTCUSD'
-const INTERVAL = '5m'
+const INTERVAL = '15m'
  
-async function fetchCandles(limit = 100) {
+async function fetchCandles() {
     const end_time_stamp = Math.floor(Date.now() / 1000)
-    const start_time_stamp = end_time_stamp - (6 * 60 * 60)
+    const start_time_stamp = end_time_stamp - (40 * 60 * 60)
     const response = await axios.get(`${api_url}/v2/history/candles`, {
         params : { 
             symbol : SYMBOL, 
@@ -15,8 +15,7 @@ async function fetchCandles(limit = 100) {
             start : start_time_stamp, 
             end : end_time_stamp 
         }
-    });  
-
+    });   
   return response.data.result.reverse().map(candle => ({
     time: candle.time,
     open: parseFloat(candle.open),

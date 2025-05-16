@@ -415,18 +415,18 @@ function continueCheckTrend(){
                 await sleep(500)
             } 
         }   
-        console.clear() 
-        console.table([
-            { Label: 'Current trend', Data: current_trend },
-            { Label: 'BUY PROFIT BORDER', Data: border_buy_profit_price },
-            { Label: 'BUY BORDER', Data: border_buy_price },
-            { Label: 'CURRENT PRICE', Data: border_price },
-            { Label: 'SELL BORDER', Data: border_sell_price },
-            { Label: 'SELL PROFIT BORDER', Data: border_sell_profit_price },
-            { Label: 'IS UPDATED', Data: is_update??null },
-            { Label: 'current_running_order', Data: current_running_order },
-            { Label: 'number_of_time_order_executed', Data: number_of_time_order_executed }
-        ]) 
+        // console.clear() 
+        // console.table([
+        //     { Label: 'Current trend', Data: current_trend },
+        //     { Label: 'BUY PROFIT BORDER', Data: border_buy_profit_price },
+        //     { Label: 'BUY BORDER', Data: border_buy_price },
+        //     { Label: 'CURRENT PRICE', Data: border_price },
+        //     { Label: 'SELL BORDER', Data: border_sell_price },
+        //     { Label: 'SELL PROFIT BORDER', Data: border_sell_profit_price },
+        //     { Label: 'IS UPDATED', Data: is_update??null },
+        //     { Label: 'current_running_order', Data: current_running_order },
+        //     { Label: 'number_of_time_order_executed', Data: number_of_time_order_executed }
+        // ]) 
     }, 3000)
 }
 

@@ -17,9 +17,6 @@ let transporter = nodemailer.createTransport({
     },
 }) 
 function sendEmail(message,subject){
-    if(!is_live){
-        return false
-    }
     let mailOptions = {
         from: 'phpspider97@gmail.com',
         to: 'neelbhardwaj97@gmail.com',
@@ -92,14 +89,14 @@ function wsConnect() {
             sendEmail(message.message,`IP ADDRESS ERROR`)
             console.log(message.message)
         }
+        if(!is_live){
+            return true
+        }
         if(total_error_count>3) { 
             is_live = false
             fs.writeFileSync('./future/orderInfo.json', '', 'utf8')
             ws.close(1000, 'Too many errors');
         }    
-        if(!is_live){
-            return true
-        }
         if(message.type == "orders"){
             if(message.state == 'closed' && message.meta_data.pnl != undefined){  
                 let order_fill_at = message?.average_fill_price

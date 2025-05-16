@@ -17,9 +17,6 @@ let transporter = nodemailer.createTransport({
   },
 }) 
 function sendEmail(message,subject){
-    // if(!is_live){
-    //     return true
-    // }
     let mailOptions = {
         from: 'phpspider97@gmail.com',
         to: 'neelbhardwaj97@gmail.com',
@@ -51,7 +48,8 @@ let total_error_count               =   0
 let number_of_time_order_executed   =   0
 let roundedToHundred                =   (price) => Math.round(price / 100) * 100
 let reconnectInterval               =   2000
-let order_in_progress               =    false 
+let order_in_progress               =   false 
+let is_price_out_of_grid            =   false
 
 function wsConnect() { 
     const WEBSOCKET_URL = SOCKET_URL
@@ -86,16 +84,15 @@ function wsConnect() {
                 sendEmail(message.message,`IP ADDRESS ERROR`)
                 console.log(message.message)
             }
+            if(!is_live){ 
+                return true
+            } 
             if(total_error_count > 3) { 
                 console.log('total_error_count',is_live)
                 is_live = false
                 fs.writeFileSync('./grid/orderInfo.json', '', 'utf8')
                 ws.close(1000, 'Too many errors');
-            }     
-            if(!is_live){
-                console.log('socket_is_live',is_live)
-                return true
-            } 
+            }
             if(message.type == "orders"){
                 if(message.state == 'closed' && message.meta_data.pnl != undefined){  
                     const side = message.side
@@ -109,12 +106,14 @@ function wsConnect() {
             }
             if(message.type == "v2/ticker"){
                 let candle_current_price = message?.close
-                if (candle_current_price > upper_price+profit_margin || candle_current_price < lower_price-profit_margin) {
+                if (candle_current_price > upper_price+profit_margin || candle_current_price < lower_price-profit_margin && !is_price_out_of_grid ) {
+                    is_price_out_of_grid = true
                     sendEmail('',`PRICE OUT OF THE GRID NOW GRID STOP FOR 10 MINUTE`)
                     await cancelAllOpenOrder()
                     setTimeout(async () => {
                         sendEmail('',`GRID CREATE AGAIN AFTER 10 MINUTE`)
                         await setRangeLimitOrder()
+                        is_price_out_of_grid = false
                     }, 600000) // 10 min
                 }
                 triggerOrder(candle_current_price)
@@ -328,18 +327,17 @@ async function getBalance() {
 }
 
 (function() { 
-  is_live = (fs.statSync('./grid/orderInfo.json').size != 0)?true:false
-  console.log('start___is_live___',is_live)
-  if(is_live){
-      let order_data = fs.readFileSync('./grid/orderInfo.json', 'utf8')
-      order_data = JSON.parse(order_data) 
-    
-      bitcoin_product_id = order_data.bitcoin_product_id
-      upper_price = order_data.upper_price
-      border_buy_price = order_data.border_buy_price
-      lower_price = order_data.lower_price 
-      grid_spacing = order_data.grid_spacing 
-  }
+    is_live = (fs.statSync('./grid/orderInfo.json').size != 0)?true:false
+    if(is_live){
+        let order_data = fs.readFileSync('./grid/orderInfo.json', 'utf8')
+        order_data = JSON.parse(order_data) 
+        
+        bitcoin_product_id = order_data.bitcoin_product_id
+        upper_price = order_data.upper_price
+        border_buy_price = order_data.border_buy_price
+        lower_price = order_data.lower_price 
+        grid_spacing = order_data.grid_spacing 
+    }
 })();
 
 async function updateOrderInfo(content){

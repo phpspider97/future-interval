@@ -18,9 +18,6 @@ let transporter = nodemailer.createTransport({
 })
 
 function sendEmail(message,subject){
-    if(!is_live){
-        return false
-    }
     let mailOptions = {
         from: 'phpspider97@gmail.com',
         to: 'neelbhardwaj97@gmail.com',
@@ -58,6 +55,7 @@ let total_error_count               =   0
 let order_in_progress               =   false   
 let current_running_order           =   '' 
 let reconnectInterval               =   2000
+let body_param_for_testing          =   {}
 
 function wsConnect() { 
   const WEBSOCKET_URL = SOCKET_URL
@@ -93,13 +91,13 @@ function wsConnect() {
             sendEmail(message.message,`IP ADDRESS ERROR`)
             console.log(message.message)
         }
+        if(!is_live){
+            return true
+        }
         if(total_error_count>3) { 
             is_live = false
             fs.writeFileSync('./option/orderInfo.json', '', 'utf8')
             ws.close(1000, 'Too many errors');
-        }
-        if(!is_live){
-            return true
         }
         if(message.type == "v2/ticker"){ 
             let candle_current_price = message?.spot_price
@@ -271,7 +269,7 @@ async function createOrder(product_id,bitcoin_option_symbol) {
             side: 'sell', 
             order_type: "market_order"
         }
- 
+        body_param_for_testing = bodyParams
         const signaturePayload = `POST${timestamp}/v2/orders${JSON.stringify(bodyParams)}`;
         const signature = await generateEncryptSignature(signaturePayload);
 
@@ -323,7 +321,7 @@ async function createOrder(product_id,bitcoin_option_symbol) {
         }
         return { message: "Order failed", status: false };
     } catch (error) {
-        sendEmail(error.message,`ERROR IN WHEN CREATING ORDER`) 
+        sendEmail(error.message + '' + JSON.stringify(body_param_for_testing),`ERROR IN WHEN CREATING ORDER`) 
         total_error_count++ 
         order_in_progress = false; 
         return { message: error?.message, status: false };

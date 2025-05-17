@@ -16,8 +16,18 @@ let transporter = nodemailer.createTransport({
       pass: process.env.USER_PASSWORD
     },
 }) 
+
+const lastSentTimestamps = {};
+const THROTTLE_INTERVAL_MS = 60 * 1000;
 function sendEmail(message,subject){
-    //return true
+    const now = Date.now();
+    const subjectKey = subject.trim().toLowerCase();
+    if (lastSentTimestamps[subjectKey] && now - lastSentTimestamps[subjectKey] < THROTTLE_INTERVAL_MS) {
+        console.log(`Throttled: Email with subject "${subject}" was sent recently.`);
+        return;
+    }
+    lastSentTimestamps[subjectKey] = now;
+ 
     let mailOptions = {
         from: 'phpspider97@gmail.com',
         to: 'neelbhardwaj97@gmail.com',
@@ -104,6 +114,8 @@ function wsConnect() {
                 let spot_price = parseInt(message?.average_fill_price)
                 let side = message?.side 
                 
+                sendEmail('',`CREATE ${side.toUpperCase()} ORDER AT ${spot_price}`)
+
                 border_buy_price = spot_price - buy_sell_point
                 border_buy_profit_price = spot_price + buy_sell_profit_point
                 border_price = spot_price
@@ -153,6 +165,17 @@ function wsConnect() {
   async function resetLoop(){ 
     current_running_order = ''
     number_of_time_order_executed = 0
+    updateOrderInfo(JSON.stringify({
+        bitcoin_product_id,
+        border_buy_profit_price,
+        border_buy_price,
+        border_price:spot_price,
+        border_sell_price,
+        border_sell_profit_price,
+        is_update:false,
+        current_running_order:'',
+        number_of_time_order_executed:0
+    }))
     await cancelAllOpenOrder()
   }
   async function onClose(code, reason) {
@@ -256,7 +279,7 @@ async function createOrder(bidType,order_price,bitcoin_current_price) {
             post_only: true, 
             stop_trigger_method: "last_traded_price"
         };
-        console.log('bodyParams__',bodyParams)
+        //console.log('bodyParams__',bodyParams)
 
         const signaturePayload = `POST${timestamp}/v2/orders${JSON.stringify(bodyParams)}`;
         const signature = await generateEncryptSignature(signaturePayload);
@@ -275,7 +298,7 @@ async function createOrder(bidType,order_price,bitcoin_current_price) {
                 <tr>
                     <td>Size</td>
                     <td>:</td>
-                    <td>${lot_size_array[number_of_time_order_executed]}</td> 
+                    <td>1</td> 
                 </tr>
                 <tr>
                     <td>Side</td>
@@ -314,7 +337,7 @@ async function createOrder(bidType,order_price,bitcoin_current_price) {
                 </tr> 
             </table>
             `
-            sendEmail(message_template,`CREATE ORDER : ${lot_size_array[number_of_time_order_executed]} - ${bidType}`)
+            //sendEmail(message_template,`CREATE ORDER : ${lot_size_array[number_of_time_order_executed]} - ${bidType}`)
 
             number_of_time_order_executed++ 
             create_order_info.push(response.data.result.id)
@@ -345,7 +368,7 @@ async function getCurrentPrice() {
 }
  
 async function init() {  
-    try{
+    try{ 
         await cancelAllOpenOrder()
         const result = await getCurrentPrice() 
         if (!result?.data?.close) return
@@ -359,8 +382,8 @@ async function init() {
         border_sell_profit_price = spot_price - buy_sell_profit_point
         is_update  = false
         total_error_count = 0   
-           
-        continueCheckTrend()
+        number_of_time_order_executed = 0
+        current_running_order = ''
  
         updateOrderInfo(JSON.stringify({
             bitcoin_product_id,
@@ -370,9 +393,12 @@ async function init() {
             border_sell_price,
             border_sell_profit_price,
             is_update:false,
-            current_running_order,
+            current_running_order:'',
             number_of_time_order_executed:0
         }))
+
+        continueCheckTrend()
+
     }catch(error){
         sendEmail(error.message,`ERROR IN WHEN CALL INIT FUNCTION`)
     }
@@ -387,14 +413,14 @@ function updatePriceSetting(spot_price){
     border_sell_price = spot_price + buy_sell_point
     border_sell_profit_price = spot_price - buy_sell_profit_point
 }
-function continueCheckTrend(){
-    setInterval( async () => {
+function continueCheckTrend(){ 
+    setInterval( async () => { 
         const result = await getCurrentPrice() 
         if (!result?.data?.close) return
         const spot_price = Math.round(parseInt(result?.data?.close))
         bitcoin_product_id = result.data.product_id 
         let current_trend = await findCandleTrend() 
-        current_trend = 'bear'  
+        //current_trend = 'bear'  
         if(current_trend == 'bear' && number_of_time_order_executed == 0 && current_running_order == ''){
             number_of_time_order_executed++ 
             await cancelAllOpenOrder()
@@ -460,13 +486,13 @@ async function cancelPerticularOpenOrder() {
         return { message: error.message, status: false };
     }
 }
- 
+  
 async function getBalance() {
     try {   
         const timestamp = Math.floor(Date.now() / 1000)
         const signaturePayload = `GET${timestamp}/v2/wallet/balances`;
         const signature = await generateEncryptSignature(signaturePayload);
-
+ 
         const headers = {
             "api-key": KEY,
             "signature": signature,

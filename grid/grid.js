@@ -16,9 +16,9 @@ let transporter = nodemailer.createTransport({
     pass: process.env.USER_PASSWORD
   },
 }) 
-const lastSentTimestamps = {};
-const THROTTLE_INTERVAL_MS = 60 * 1000;
 
+const lastSentTimestamps = {}
+const THROTTLE_INTERVAL_MS = 60 * 1000
 function sendEmail(message,subject){
     const now = Date.now();
     const subjectKey = subject.trim().toLowerCase();

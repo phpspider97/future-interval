@@ -18,15 +18,23 @@ let transporter = nodemailer.createTransport({
 })
 
 function sendEmail(message,subject){
+    const now = Date.now();
+    const subjectKey = subject.trim().toLowerCase();
+    if (lastSentTimestamps[subjectKey] && now - lastSentTimestamps[subjectKey] < THROTTLE_INTERVAL_MS) {
+        console.log(`Throttled: Email with subject "${subject}" was sent recently.`);
+        return;
+    }
+    lastSentTimestamps[subjectKey] = now;
+ 
     let mailOptions = {
         from: 'phpspider97@gmail.com',
         to: 'neelbhardwaj97@gmail.com',
         subject: 'OPTION BOT : ' +subject,
         html: message
-    } 
+    }
     transporter.sendMail(mailOptions, (error, info) => {
         if (error) {
-            console.log('Error:', error);
+            return console.log('Error:', error);
         }
         console.log('Email sent:', info.response);
     });

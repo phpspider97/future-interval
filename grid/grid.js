@@ -16,7 +16,18 @@ let transporter = nodemailer.createTransport({
     pass: process.env.USER_PASSWORD
   },
 }) 
+const lastSentTimestamps = {};
+const THROTTLE_INTERVAL_MS = 60 * 1000;
+
 function sendEmail(message,subject){
+    const now = Date.now();
+    const subjectKey = subject.trim().toLowerCase();
+    if (lastSentTimestamps[subjectKey] && now - lastSentTimestamps[subjectKey] < THROTTLE_INTERVAL_MS) {
+        console.log(`Throttled: Email with subject "${subject}" was sent recently.`);
+        return;
+    }
+    lastSentTimestamps[subjectKey] = now;
+ 
     let mailOptions = {
         from: 'phpspider97@gmail.com',
         to: 'neelbhardwaj97@gmail.com',

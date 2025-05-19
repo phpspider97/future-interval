@@ -20,6 +20,7 @@ let transporter = nodemailer.createTransport({
 const lastSentTimestamps = {}
 const THROTTLE_INTERVAL_MS = 60 * 1000
 function sendEmail(message,subject){
+    return true
     const now = Date.now();
     const subjectKey = subject.trim().toLowerCase();
     if (lastSentTimestamps[subjectKey] && now - lastSentTimestamps[subjectKey] < THROTTLE_INTERVAL_MS) {
@@ -54,7 +55,7 @@ let lower_price                     =   0
 let upper_price                     =   0 
 let grid_spacing                    =   0
 let numberOfGrids                   =   11
-let profit_margin                   =   100
+let profit_margin                   =   200
 let total_error_count               =   0 
 let number_of_time_order_executed   =   0
 let roundedToHundred                =   (price) => Math.round(price / 100) * 100
@@ -149,7 +150,7 @@ function wsConnect() {
                 total_error_count = 0 
                 sendEmail('',`SOCKET RE-CONNECT AGAIN AFTER 1 MINUTE CLOSED DUE TO TOO MANY ERROR`)
                 wsConnect()
-                resetLoop()
+                //resetLoop()
             }, 60000)
         }else{
             total_error_count = 0
@@ -225,12 +226,15 @@ async function setRangeLimitOrder() {
         const current_price = Math.round(response.data.result.close);  
         bitcoin_product_id = response.data.result.product_id;
         let round_of_current_price = roundedToHundred(current_price)
-        upper_price       =  round_of_current_price + 600
-        lower_price       =  round_of_current_price - 500
+        //console.log('round_of_current_price___',round_of_current_price)
+        upper_price       =  round_of_current_price + 1200
+        lower_price       =  round_of_current_price - 1000
         grid_spacing      =  (upper_price - lower_price) / numberOfGrids;
         
+        //console.log('grid_spacing___',grid_spacing)    
+        
         for (let i = 0; i < numberOfGrids; i++) {
-            const rawBuyPrice = lower_price + i * grid_spacing;  
+            const rawBuyPrice = lower_price + i * grid_spacing
             given_price_range.push({
                 price : rawBuyPrice,
                 fill : {
@@ -242,6 +246,10 @@ async function setRangeLimitOrder() {
  
         const first_five = given_price_range.slice(0, 5)
         const last_five = given_price_range.slice(-5)
+
+        // console.log('current_price___',current_price)
+        // console.log('first_five___',first_five)
+        // console.log('last_five___',last_five)
 
         first_five.forEach(async (data)=>{
             order_in_progress = false

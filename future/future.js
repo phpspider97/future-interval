@@ -16,18 +16,8 @@ let transporter = nodemailer.createTransport({
       pass: process.env.USER_PASSWORD
     },
 }) 
-
-const lastSentTimestamps = {};
-const THROTTLE_INTERVAL_MS = 60 * 1000;
 function sendEmail(message,subject){
-    const now = Date.now();
-    const subjectKey = subject.trim().toLowerCase();
-    if (lastSentTimestamps[subjectKey] && now - lastSentTimestamps[subjectKey] < THROTTLE_INTERVAL_MS) {
-        console.log(`Throttled: Email with subject "${subject}" was sent recently.`);
-        return;
-    }
-    lastSentTimestamps[subjectKey] = now;
- 
+    //return true
     let mailOptions = {
         from: 'phpspider97@gmail.com',
         to: 'neelbhardwaj97@gmail.com',
@@ -49,22 +39,26 @@ const SECRET        =   process.env.FUTURE_WEB_SECRET
 const USER_ID       =   process.env.FUTURE_WEB_USER_ID
 
 let lot_size_array                  =    [1, 1, 1] 
-let is_live                         =    false 
-let bitcoin_product_id              =    0 
+let is_live                         =    false
+let LOSS_EXCEED_LIMIT               =    0 
+let bitcoin_product_id              =    0
+let is_break_time                   =    false
 let border_buy_price                =    0
 let border_buy_profit_price         =    0
 let border_price                    =    0
 let border_sell_price               =    0
 let border_sell_profit_price        =    0
-let buy_sell_profit_point           =    140
-let buy_sell_point                  =    100
+let buy_sell_profit_point           =    200
+let buy_sell_point                  =    50
 let total_error_count               =    0
 let order_in_progress               =    false   
 let current_running_order           =    ''
 let reconnectInterval               =    2000
-let number_of_time_order_executed   =    0  
-let create_order_info               =    []
-let is_update                       =    false
+let number_of_time_order_executed   =    0 
+let buy_order_arr                   =   []
+let sell_order_arr                  =   []
+let extra_buy_range                 =   0
+let extra_sell_range                =   0
 
 function wsConnect() { 
   const WEBSOCKET_URL = SOCKET_URL;
@@ -98,7 +92,7 @@ function wsConnect() {
     } else {
         if(message.type == 'error'){
             sendEmail(message.message,`IP ADDRESS ERROR`)
-            console.log("FUTURE : " + message.message)
+            console.log(message.message)
         }
         if(!is_live){
             return true
@@ -108,23 +102,87 @@ function wsConnect() {
             fs.writeFileSync('./future/orderInfo.json', '', 'utf8')
             ws.close(1000, 'Too many errors');
         }    
-         
         if(message.type == "orders"){
-            if(message.state == 'closed' && message.meta_data.pnl != undefined){   
-                let spot_price = parseInt(message?.average_fill_price)
-                let side = message?.side 
-                
-                sendEmail('',`CREATE ${side.toUpperCase()} ORDER AT ${spot_price}`)
-
-                border_buy_price = spot_price - buy_sell_point
-                border_buy_profit_price = spot_price + buy_sell_profit_point
-                border_price = spot_price
-                border_sell_price = spot_price + buy_sell_point
-                border_sell_profit_price = spot_price - buy_sell_profit_point
+            // console.log('') 
+            // console.log('message__',JSON.stringify(message))
+            // console.log('') 
+            if(message.state == 'closed' && message.meta_data.pnl != undefined){  
+                //console.log('message___',JSON.stringify(message))
+                let order_fill_at = message?.average_fill_price
+                let side = message?.side
+                let size = message?.size
+                let is_update = false
                 current_running_order = side
-                is_update = true
+
+                console.log('pnl___',message.meta_data.pnl)
+
+                await cancelPerticularOpenOrder()
+
+                if(message.meta_data.pnl > 0){
+                    await init()
+                    return false
+                }
+                if(message.meta_data.pnl < 0){
+                    await init()
+                    return false
+                }
+
+                sendEmail('',`CREATE ${side.toUpperCase()} ORDER AT ${order_fill_at}`)
+
+                
  
-                if(is_update){
+                if(side == 'sell'){
+                    let order_fill_difference = border_sell_price-order_fill_at
+                    if(order_fill_difference>20){
+                        is_update = true
+                        border_buy_price -= order_fill_difference 
+                        border_buy_profit_price -= order_fill_difference
+                        border_price -= order_fill_difference
+                        border_sell_price -= order_fill_difference
+                        border_sell_profit_price -= order_fill_difference
+                    } 
+
+                    //console.log('1___',border_buy_price,border_buy_profit_price)
+                    let buy_grid    =   generateGrid(border_buy_price,border_buy_profit_price,50)
+                    buy_grid.slice(0,3).forEach( async (stop_price)=>{
+                        order_in_progress = false 
+                        await createOrder('buy',stop_price,border_price,false,size)
+                        await sleep(800)
+                    })
+                    let sell_grid   =   generateGrid(border_sell_profit_price-200,border_sell_profit_price,50)
+                    sell_grid.slice(-3).forEach( async (stop_price)=>{
+                        order_in_progress = false 
+                        await createOrder('buy',stop_price,border_price,true,size)
+                        await sleep(800)
+                    })
+                }
+                if(side == 'buy'){
+                    let order_fill_difference = order_fill_at-border_buy_price
+                    if(order_fill_difference>20){
+                        is_update = true
+                        border_buy_price += order_fill_difference 
+                        border_buy_profit_price += order_fill_difference
+                        border_price += order_fill_difference
+                        border_sell_price += order_fill_difference
+                        border_sell_profit_price += order_fill_difference
+                    } 
+  
+                    let buy_grid  =  generateGrid(border_buy_profit_price,border_buy_profit_price+200,50)
+                    buy_grid.slice(0,3).forEach( async (stop_price)=>{
+                        order_in_progress = false 
+                        await createOrder('sell',stop_price,border_price,true,size)
+                        await sleep(800)
+                    })
+
+                    let sell_grid   =   generateGrid(border_sell_profit_price,border_sell_price ,50)
+                    sell_grid.slice(-3).forEach( async (stop_price)=>{
+                        order_in_progress = false 
+                        await createOrder('sell',stop_price,border_price,false,size)
+                        await sleep(800)
+                    })
+                }
+
+                if(is_update){ 
                     updateOrderInfo(JSON.stringify({
                         bitcoin_product_id,
                         border_buy_profit_price,
@@ -132,24 +190,30 @@ function wsConnect() {
                         border_price,
                         border_sell_price,
                         border_sell_profit_price,
-                        is_update:true,
-                        current_running_order,
-                        number_of_time_order_executed
+                        is_update:true
                     }))
                 }
-                await cancelPerticularOpenOrder()
             }
         }
-          
         if(message.type == "v2/ticker"){
             let candle_current_price = message?.close
-             
-            if (current_running_order == 'buy' && (candle_current_price > border_buy_profit_price || candle_current_price < border_buy_price) ) {
-                await resetLoop()
-            } 
-            if (current_running_order == 'sell' && (candle_current_price < border_sell_profit_price || candle_current_price > border_sell_price) ) { 
-                await resetLoop() 
-            } 
+            if(is_break_time == true){
+                return true
+            }
+            
+            if(current_running_order == 'sell'){
+                extra_buy_range = -80
+                extra_sell_range = 150
+            }
+
+            if(current_running_order == 'buy'){
+                extra_buy_range = 150
+                extra_sell_range = -80
+            }
+
+            if (candle_current_price > border_buy_profit_price+extra_buy_range || candle_current_price < border_sell_profit_price-extra_sell_range ) {
+                await init()
+            }
             await triggerOrder(candle_current_price)
         } 
     } 
@@ -163,20 +227,11 @@ function wsConnect() {
     }, reconnectInterval)
   }
   async function resetLoop(){ 
-    current_running_order = ''
     number_of_time_order_executed = 0
-    updateOrderInfo(JSON.stringify({
-        bitcoin_product_id,
-        border_buy_profit_price,
-        border_buy_price,
-        border_price:border_price,
-        border_sell_price,
-        border_sell_profit_price,
-        is_update:false,
-        current_running_order:'',
-        number_of_time_order_executed:0
-    }))
-    await cancelAllOpenOrder()
+    setTimeout(async () => {
+        await init()
+        is_break_time = false
+    }, 60000)
   }
   async function onClose(code, reason) {
     console.log(`Socket closed with code: ${code}, reason: ${reason.toString()}`)
@@ -187,8 +242,8 @@ function wsConnect() {
         total_error_count = 0 
         sendEmail('',`SOCKET RE-CONNECT AGAIN AFTER 1 MINUTE CLOSED DUE TO TOO MANY ERROR`)
         wsConnect()
-        resetLoop()
-      }, 60000);
+        init()
+      }, 60000)
 
     }else{
       total_error_count = 0
@@ -225,7 +280,8 @@ function wsConnect() {
   ws.on('error', onError);
   ws.on('close', onClose);
 }
-
+wsConnect()
+  
 async function generateEncryptSignature(signaturePayload) { 
   return crypto.createHmac("sha256", SECRET).update(signaturePayload).digest("hex");
 }
@@ -235,9 +291,9 @@ async function cancelAllOpenOrder() {
         current_running_order = ''
         const timestamp = Math.floor(Date.now() / 1000)
         const bodyParams = {
-            close_all_portfolio: true,
-            close_all_isolated: true,
-            user_id: USER_ID,
+        close_all_portfolio: true,
+        close_all_isolated: true,
+        user_id: USER_ID,
         }; 
         const signaturePayload = `POST${timestamp}/v2/positions/close_all${JSON.stringify(bodyParams)}`;
         const signature = await generateEncryptSignature(signaturePayload);
@@ -255,35 +311,61 @@ async function cancelAllOpenOrder() {
         return { message: error.message, status: false };
     }
 }
- 
-async function createOrder(bidType,order_price,bitcoin_current_price) {
-    try {  
+
+async function createOrder(bidType,order_price,bitcoin_current_price,is_limit_order=false,size) {
+    try { 
+        // let current_trend = await findCandleTrend() 
+        // if(bidType == 'sell' && (current_trend == 'neutral' || current_trend == 'bull') ){
+        //     return true
+        // }
+        // if(bidType == 'buy' && (current_trend == 'neutral' || current_trend == 'bear') ){
+        //     return true
+        // } 
+        if(number_of_time_order_executed > lot_size_array.length-1){
+            number_of_time_order_executed = 0 
+        }   
         if(total_error_count > 3){
             return true
-        } 
+        }
+        if(LOSS_EXCEED_LIMIT>3){ 
+            sendEmail('',`${bidType.toUpperCase()} ORDER RESTRICT DUE TO EXCEED LOSS LIMIT`)
+            return true
+        }
         if (order_in_progress){ 
             return true
         }
         order_in_progress = true
     
         const timestamp = Math.floor(Date.now() / 1000)
-        const bodyParams = { 
-            product_id: bitcoin_product_id,
-            product_symbol: "BTCUSD",
-            size: 1,
-            side: bidType,
-            order_type: "limit_order", 
-            stop_order_type: "stop_loss_order", 
-            limit_price : (bidType == 'buy')?order_price-2:order_price, 
-            stop_price  : (bidType == 'buy')?order_price:order_price-2,
-            post_only: true, 
-            stop_trigger_method: "last_traded_price"
-        };
-        //console.log('bodyParams__',bodyParams)
-
+        let bodyParams = {}
+        if(is_limit_order){
+            bodyParams = {
+                product_id: bitcoin_product_id,
+                product_symbol: "BTCUSD",
+                size: size,
+                side: bidType,
+                order_type: "limit_order",  
+                limit_price : order_price,
+            }
+        }else{
+            bodyParams = {
+                product_id: bitcoin_product_id,
+                product_symbol: "BTCUSD",
+                size: 1,
+                side: bidType,
+                order_type: "limit_order", 
+                stop_order_type: "stop_loss_order", 
+                limit_price : (bidType == 'buy')?order_price-2:order_price, 
+                stop_price  : (bidType == 'buy')?order_price:order_price-2,
+                post_only: true, 
+                stop_trigger_method: "last_traded_price"
+            }
+        }
+         
+        //console.log('bodyParams', bitcoin_current_price, bodyParams)
         const signaturePayload = `POST${timestamp}/v2/orders${JSON.stringify(bodyParams)}`;
         const signature = await generateEncryptSignature(signaturePayload);
- 
+
         const headers = {
             "api-key": KEY,
             "signature": signature,
@@ -291,61 +373,14 @@ async function createOrder(bidType,order_price,bitcoin_current_price) {
             "Content-Type": "application/json",
             "Accept": "application/json",
         };
-        const response = await axios.post(`${API_URL}/v2/orders`, bodyParams, { headers }) 
-        if (response.data.success) { 
-            const message_template = `<br /><br /><br />
-            <table border="1" cellpadding="8" cellspacing="3">
-                <tr>
-                    <td>Size</td>
-                    <td>:</td>
-                    <td>1</td> 
-                </tr>
-                <tr>
-                    <td>Side</td>
-                    <td>:</td>
-                    <td>${bidType}</td> 
-                </tr>
-                <tr>
-                    <td>Current Price</td>
-                    <td>:</td>
-                    <td>${bitcoin_current_price}</td> 
-                </tr>
-                <tr style='background:green;color:white'>
-                    <td>Border Buy Profit Price</td>
-                    <td>:</td>
-                    <td>${border_buy_profit_price}</td> 
-                </tr>
-                <tr style='background:green;color:white'>
-                    <td>border_buy_price</td>
-                    <td>:</td>
-                    <td>${border_buy_price}</td> 
-                </tr>
-                <tr style='background:yellow;color:black'>
-                    <td>Border Price</td>
-                    <td>:</td>
-                    <td>${border_price}</td> 
-                </tr> 
-                <tr style='background:red;color:white'>
-                    <td>Border Sell Price</td>
-                    <td>:</td>
-                    <td>${border_sell_price}</td> 
-                </tr>
-                <tr style='background:red;color:white'>
-                    <td>Border Sell Profit Price</td>
-                    <td>:</td>
-                    <td>${border_sell_profit_price}</td> 
-                </tr> 
-            </table>
-            `
-            //sendEmail(message_template,`CREATE ORDER : ${lot_size_array[number_of_time_order_executed]} - ${bidType}`)
-
-            number_of_time_order_executed++ 
-            create_order_info.push(response.data.result.id)
+        const response = await axios.post(`${API_URL}/v2/orders`, bodyParams, { headers });
+            
+        if (response.data.success) {  
+            number_of_time_order_executed++
             return { data: response.data, status: true }
         }
         return { message: "Order failed", status: false }
-    } catch (error) {
-        console.log(error.message) 
+    } catch (error) { 
         sendEmail(error.message,`ERROR IN WHEN CREATING ORDER`) 
         total_error_count++ 
         order_in_progress = false;  
@@ -366,25 +401,43 @@ async function getCurrentPrice() {
         return { message: error.message, status: false };
     }
 }
- 
+
+function generateGrid(start,end,step){
+    const points = []
+    for (let i = start; i <= end; i += step) {
+        points.push(i);
+    }
+    return points
+}
+function sleep(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+}
 async function init() {  
-    try{ 
+    try{
         await cancelAllOpenOrder()
+        //await cancelPerticularOpenOrder()
+        let buy_grid = []
+        let sell_grid = []
+
         const result = await getCurrentPrice() 
         if (!result?.data?.close) return
         const spot_price = Math.round(result?.data?.close)
-
-        bitcoin_product_id = result.data.product_id 
-        border_buy_price = spot_price - buy_sell_point
-        border_buy_profit_price = spot_price + buy_sell_profit_point
+        bitcoin_product_id = result.data.product_id
+        
+        border_buy_price = spot_price + buy_sell_point
+        border_buy_profit_price = border_buy_price + buy_sell_profit_point
         border_price = spot_price
-        border_sell_price = spot_price + buy_sell_point
-        border_sell_profit_price = spot_price - buy_sell_profit_point
-        is_update  = false
+        border_sell_price = spot_price - buy_sell_point
+        border_sell_profit_price = border_sell_price - buy_sell_profit_point
+    
         total_error_count = 0   
-        number_of_time_order_executed = 0
-        current_running_order = ''
- 
+        
+        console.log('==================BUY PROFIT BORDER==================',border_buy_profit_price)
+        console.log('==================BUY BORDER==================',border_buy_price)
+        console.log('==================CURRENT PRICE==================',spot_price)
+        console.log('==================SELL BORDER==================',border_sell_price)
+        console.log('==================SELL PROFIT BORDER==================',border_sell_profit_price)
+
         updateOrderInfo(JSON.stringify({
             bitcoin_product_id,
             border_buy_profit_price,
@@ -392,68 +445,27 @@ async function init() {
             border_price:spot_price,
             border_sell_price,
             border_sell_profit_price,
-            is_update:false,
-            current_running_order:'',
-            number_of_time_order_executed:0
+            is_update:false
         }))
-
-        continueCheckTrend()
+ 
+        buy_grid    =   generateGrid(border_buy_price,border_buy_profit_price,50)
+        sell_grid   =   generateGrid(border_sell_profit_price,border_sell_price,50)
+          
+        buy_grid.slice(0,3).forEach( async (stop_price)=>{
+            order_in_progress = false 
+            await createOrder('buy',stop_price,border_price,false,1)
+            await sleep(800)
+        })
+        sell_grid.slice(-3).forEach( async (stop_price)=>{
+            order_in_progress = false 
+            await createOrder('sell',stop_price,border_price,false,1)
+            await sleep(800)
+        })
+ 
 
     }catch(error){
         sendEmail(error.message,`ERROR IN WHEN CALL INIT FUNCTION`)
     }
-}
-function sleep(ms) {
-    return new Promise(resolve => setTimeout(resolve, ms));
-}
-function updatePriceSetting(spot_price){
-    border_buy_price = spot_price - buy_sell_point
-    border_buy_profit_price = spot_price + buy_sell_profit_point
-    border_price = spot_price
-    border_sell_price = spot_price + buy_sell_point
-    border_sell_profit_price = spot_price - buy_sell_profit_point
-}
-function continueCheckTrend(){ 
-    setInterval( async () => { 
-        const result = await getCurrentPrice() 
-        if (!result?.data?.close) return
-        const spot_price = Math.round(parseInt(result?.data?.close))
-        bitcoin_product_id = result.data.product_id 
-        let current_trend = await findCandleTrend() 
-        //current_trend = 'bear'  
-        if(current_trend == 'bear' && number_of_time_order_executed == 0 && current_running_order == ''){
-            number_of_time_order_executed++ 
-            await cancelAllOpenOrder()
-            for(let count = 60; count >= 20; count-=20){ 
-                order_in_progress = false
-                updatePriceSetting(spot_price)
-                await createOrder('sell',spot_price - count,spot_price)
-                await sleep(500)
-            }
-        }  
-        if(current_trend == 'bull' && number_of_time_order_executed == 0 && current_running_order == ''){
-            number_of_time_order_executed++
-            await cancelAllOpenOrder()
-            for (let count = 20; count <= 60; count += 20) {
-                order_in_progress = false
-                updatePriceSetting(spot_price)
-                await createOrder('buy',spot_price + count,spot_price)
-                await sleep(500)
-            } 
-        }   
-        // console.clear() 
-        // console.table([
-        //     { Label: 'Current trend', Data: current_trend },
-        //     { Label: 'BUY PROFIT BORDER', Data: border_buy_profit_price },
-        //     { Label: 'BUY BORDER', Data: border_buy_price },
-        //     { Label: 'CURRENT PRICE', Data: border_price },
-        //     { Label: 'SELL BORDER', Data: border_sell_price },
-        //     { Label: 'SELL PROFIT BORDER', Data: border_sell_profit_price },
-        //     { Label: 'IS UPDATED', Data: is_update??null },
-        //     { Label: 'current_running_order', Data: current_running_order },
-        //     { Label: 'number_of_time_order_executed', Data: number_of_time_order_executed }
-        // ]) 
-    }, 3000)
 }
 
 async function cancelPerticularOpenOrder() {
@@ -486,13 +498,13 @@ async function cancelPerticularOpenOrder() {
         return { message: error.message, status: false };
     }
 }
-  
+
 async function getBalance() {
     try {   
         const timestamp = Math.floor(Date.now() / 1000)
         const signaturePayload = `GET${timestamp}/v2/wallet/balances`;
         const signature = await generateEncryptSignature(signaturePayload);
- 
+
         const headers = {
             "api-key": KEY,
             "signature": signature,
@@ -510,8 +522,6 @@ async function getBalance() {
 (function() { 
     is_live = (fs.statSync('./future/orderInfo.json').size != 0)?true:false
     if(is_live){
-        wsConnect() 
-        continueCheckTrend()
         let order_data = fs.readFileSync('./future/orderInfo.json', 'utf8')
         order_data = JSON.parse(order_data) 
         bitcoin_product_id = order_data.bitcoin_product_id
@@ -521,8 +531,6 @@ async function getBalance() {
         border_sell_price = order_data.border_sell_price
         border_sell_profit_price = order_data.border_sell_profit_price
         is_update = order_data.is_update
-        current_running_order = order_data.current_running_order
-        number_of_time_order_executed = order_data.number_of_time_order_executed
     }
 })();
   
@@ -572,7 +580,6 @@ async function triggerOrder(current_price) {
 futureEmitter.on("future_start", () => { 
     init() 
     is_live = true 
-    wsConnect()
     sendEmail('',`BOT START BUTTON PRESSED`)
 })
 

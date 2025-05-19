@@ -20,7 +20,6 @@ let transporter = nodemailer.createTransport({
 const lastSentTimestamps = {}
 const THROTTLE_INTERVAL_MS = 60 * 1000
 function sendEmail(message,subject){
-    //return true
     const now = Date.now();
     const subjectKey = subject.trim().toLowerCase();
     if (lastSentTimestamps[subjectKey] && now - lastSentTimestamps[subjectKey] < THROTTLE_INTERVAL_MS) {

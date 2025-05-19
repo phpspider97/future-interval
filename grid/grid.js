@@ -114,7 +114,7 @@ function wsConnect() {
 
                     sendEmail('',`ONE ${side} SIDE STOP ORDER TRIGGERED AT ${order_at}`)
                 }
-            }
+            } 
             if(message.type == "v2/ticker"){
                 let candle_current_price = message?.close
                 if (candle_current_price > upper_price+profit_margin || candle_current_price < lower_price-profit_margin && !is_price_out_of_grid ) {

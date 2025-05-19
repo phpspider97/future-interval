@@ -15,7 +15,7 @@ let transporter = nodemailer.createTransport({
       user: process.env.USER_EMAIL,
       pass: process.env.USER_PASSWORD
     },
-}) 
+})  
 function sendEmail(message,subject){
     //return true 
     let mailOptions = {

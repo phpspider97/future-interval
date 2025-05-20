@@ -48,7 +48,7 @@ const KEY           =   process.env.OPTION_WEB_KEY
 const SECRET        =   process.env.OPTION_WEB_SECRET 
 const USER_ID       =   process.env.OPTION_WEB_USER_ID
 
-let lot_size_array                  =   [20, 20, 20]
+let lot_size_array                  =   [10, 10, 10]
 let is_live                         =   false
 let is_break_time                   =   false
 let LOSS_EXCEED_LIMIT               =   0
@@ -273,7 +273,7 @@ async function createOrder(product_id,bitcoin_option_symbol) {
             size: lot_size_array[number_of_time_order_executed],
             side: 'sell', 
             order_type: "market_order"
-        }
+        } 
         body_param_for_testing = bodyParams
         const signaturePayload = `POST${timestamp}/v2/orders${JSON.stringify(bodyParams)}`;
         const signature = await generateEncryptSignature(signaturePayload);

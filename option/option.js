@@ -274,7 +274,7 @@ async function createOrder(product_id,bitcoin_option_symbol) {
             side: 'sell', 
             order_type: "market_order"
         } 
- 
+  
         body_param_for_testing = bodyParams
         const signaturePayload = `POST${timestamp}/v2/orders${JSON.stringify(bodyParams)}`;
         const signature = await generateEncryptSignature(signaturePayload);

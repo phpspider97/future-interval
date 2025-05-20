@@ -48,7 +48,7 @@ const KEY           =   process.env.OPTION_WEB_KEY
 const SECRET        =   process.env.OPTION_WEB_SECRET 
 const USER_ID       =   process.env.OPTION_WEB_USER_ID
 
-let lot_size_array                  =   [2, 2, 2]
+let lot_size_array                  =   [20, 20, 20]
 let is_live                         =   false
 let is_break_time                   =   false
 let LOSS_EXCEED_LIMIT               =   0

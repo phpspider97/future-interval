@@ -112,7 +112,7 @@ function wsConnect() {
                     const update_order_price = (side == 'buy')?order_at+profit_margin:order_at-profit_margin 
                     await createOrder((side == 'buy')?'sell':'buy',update_order_price)
 
-                    sendEmail('',`ONE ${side} SIDE STOP ORDER TRIGGERED AT ${order_at}`)
+                    //sendEmail('',`ONE ${side} SIDE STOP ORDER TRIGGERED AT ${order_at}`)
                 }
             } 
             if(message.type == "v2/ticker"){
@@ -289,7 +289,7 @@ async function createOrder(bid_type,order_price){
         const bodyParams = {
             product_id : bitcoin_product_id,
             product_symbol : "BTCUSD",
-            size : 1, 
+            size : 10, 
             side : bid_type,   
             order_type : "limit_order",
             limit_price : order_price

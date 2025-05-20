@@ -48,17 +48,17 @@ let border_buy_profit_price         =    0
 let border_price                    =    0
 let border_sell_price               =    0
 let border_sell_profit_price        =    0
-let buy_sell_profit_point           =    200
+let buy_sell_profit_point           =    180
 let buy_sell_point                  =    50
 let total_error_count               =    0
 let order_in_progress               =    false   
 let current_running_order           =    ''
 let reconnectInterval               =    2000
 let number_of_time_order_executed   =    0 
-let buy_order_arr                   =   []
-let sell_order_arr                  =   []
-let extra_buy_range                 =   0
-let extra_sell_range                =   0
+let extra_buy_range                 =    0
+let extra_sell_range                =    0
+let create_order_error              =   {}
+
 
 function wsConnect() { 
   const WEBSOCKET_URL = SOCKET_URL;
@@ -113,23 +113,21 @@ function wsConnect() {
                 let size = message?.size
                 let is_update = false
                 current_running_order = side
-
-                console.log('pnl___',message.meta_data.pnl)
-
+  
                 await cancelPerticularOpenOrder()
 
                 if(message.meta_data.pnl > 0){
+                    sendEmail('',`PROFIT IN ORDER : ${size} LOT OF ${side.toUpperCase()} PROFIT OF $${message.meta_data.pnl}`)
                     await init()
                     return false
                 }
                 if(message.meta_data.pnl < 0){
+                    sendEmail('',`LOSS IN ORDER : ${size} LOT OF ${side.toUpperCase()} LOSS OF $${message.meta_data.pnl}`)
                     await init()
                     return false
                 }
 
-                sendEmail('',`CREATE ${side.toUpperCase()} ORDER AT ${order_fill_at}`)
-
-                
+                sendEmail('',`CREATE ${size} LOT OF ${side.toUpperCase()} ORDER AT ${order_fill_at}`)
  
                 if(side == 'sell'){
                     let order_fill_difference = border_sell_price-order_fill_at
@@ -141,20 +139,30 @@ function wsConnect() {
                         border_sell_price -= order_fill_difference
                         border_sell_profit_price -= order_fill_difference
                     } 
+ 
+                    let buy_grid    =   generateGrid(border_buy_price,border_buy_profit_price,30)
+                    let sell_grid   =   generateGrid(border_sell_profit_price-180,border_sell_profit_price,30)
 
-                    //console.log('1___',border_buy_price,border_buy_profit_price)
-                    let buy_grid    =   generateGrid(border_buy_price,border_buy_profit_price,50)
-                    buy_grid.slice(0,3).forEach( async (stop_price)=>{
-                        order_in_progress = false 
-                        await createOrder('buy',stop_price,border_price,false,size)
-                        await sleep(800)
-                    })
-                    let sell_grid   =   generateGrid(border_sell_profit_price-200,border_sell_profit_price,50)
-                    sell_grid.slice(-3).forEach( async (stop_price)=>{
-                        order_in_progress = false 
-                        await createOrder('buy',stop_price,border_price,true,size)
-                        await sleep(800)
-                    })
+                    await Promise.all(
+                        buy_grid.slice(0, 4).map(async (stop_price) => {
+                            await createOrder('buy', stop_price, border_price, false, size) 
+                        })
+                    )
+                    await Promise.all(
+                        sell_grid.slice(-4).map(async (stop_price) => {
+                            await createOrder('buy', stop_price, border_price, true, size) 
+                        })
+                    )
+                    // buy_grid.slice(0,4).forEach( async (stop_price)=>{
+                    //     order_in_progress = false 
+                    //     await createOrder('buy',stop_price,border_price,false,size)
+                    //     await sleep(100)
+                    // })
+                    // sell_grid.slice(-4).forEach( async (stop_price)=>{
+                    //     order_in_progress = false 
+                    //     await createOrder('buy',stop_price,border_price,true,size)
+                    //     await sleep(100)
+                    // })
                 }
                 if(side == 'buy'){
                     let order_fill_difference = order_fill_at-border_buy_price
@@ -167,19 +175,31 @@ function wsConnect() {
                         border_sell_profit_price += order_fill_difference
                     } 
   
-                    let buy_grid  =  generateGrid(border_buy_profit_price,border_buy_profit_price+200,50)
-                    buy_grid.slice(0,3).forEach( async (stop_price)=>{
-                        order_in_progress = false 
-                        await createOrder('sell',stop_price,border_price,true,size)
-                        await sleep(800)
-                    })
+                    let buy_grid  =  generateGrid(border_buy_profit_price,border_buy_profit_price+180,30)
+                    let sell_grid   =   generateGrid(border_sell_profit_price,border_sell_price ,30)
 
-                    let sell_grid   =   generateGrid(border_sell_profit_price,border_sell_price ,50)
-                    sell_grid.slice(-3).forEach( async (stop_price)=>{
-                        order_in_progress = false 
-                        await createOrder('sell',stop_price,border_price,false,size)
-                        await sleep(800)
-                    })
+                    await Promise.all(
+                        buy_grid.slice(0, 4).map(async (stop_price) => {
+                            await createOrder('sell', stop_price, border_price, true, size) 
+                        })
+                    )
+                    await Promise.all(
+                        sell_grid.slice(-4).map(async (stop_price) => {
+                            await createOrder('sell', stop_price, border_price, false, size) 
+                        })
+                    )
+
+                    // buy_grid.slice(0,4).forEach( async (stop_price)=>{
+                    //     order_in_progress = false 
+                    //     await createOrder('sell',stop_price,border_price,true,size)
+                    //     await sleep(100)
+                    // })
+
+                    // sell_grid.slice(-4).forEach( async (stop_price)=>{
+                    //     order_in_progress = false 
+                    //     await createOrder('sell',stop_price,border_price,false,size)
+                    //     await sleep(100)
+                    // })
                 }
 
                 if(is_update){ 
@@ -202,13 +222,13 @@ function wsConnect() {
             }
             
             if(current_running_order == 'sell'){
-                extra_buy_range = -80
-                extra_sell_range = 150
+                extra_buy_range = -60
+                extra_sell_range = 110
             }
 
             if(current_running_order == 'buy'){
-                extra_buy_range = 150
-                extra_sell_range = -80
+                extra_buy_range = 110
+                extra_sell_range = -60
             }
 
             if (candle_current_price > border_buy_profit_price+extra_buy_range || candle_current_price < border_sell_profit_price-extra_sell_range ) {
@@ -332,7 +352,7 @@ async function createOrder(bidType,order_price,bitcoin_current_price,is_limit_or
             return true
         }
         if (order_in_progress){ 
-            return true
+            //return true
         }
         order_in_progress = true
     
@@ -357,11 +377,10 @@ async function createOrder(bidType,order_price,bitcoin_current_price,is_limit_or
                 stop_order_type: "stop_loss_order", 
                 limit_price : (bidType == 'buy')?order_price-2:order_price, 
                 stop_price  : (bidType == 'buy')?order_price:order_price-2,
-                post_only: true, 
-                stop_trigger_method: "last_traded_price"
+                //stop_trigger_method: "last_traded_price"
             }
         }
-         
+        create_order_error = bodyParams
         //console.log('bodyParams', bitcoin_current_price, bodyParams)
         const signaturePayload = `POST${timestamp}/v2/orders${JSON.stringify(bodyParams)}`;
         const signature = await generateEncryptSignature(signaturePayload);
@@ -381,7 +400,7 @@ async function createOrder(bidType,order_price,bitcoin_current_price,is_limit_or
         }
         return { message: "Order failed", status: false }
     } catch (error) { 
-        sendEmail(error.message,`ERROR IN WHEN CREATING ORDER`) 
+        sendEmail(error.message + JSON.stringify(create_order_error),`ERROR IN WHEN CREATING ORDER`) 
         total_error_count++ 
         order_in_progress = false;  
         return { message: error?.message, status: false }
@@ -409,15 +428,14 @@ function generateGrid(start,end,step){
     }
     return points
 }
-function sleep(ms) {
-    return new Promise(resolve => setTimeout(resolve, ms));
-}
+ 
 async function init() {  
     try{
-        await cancelAllOpenOrder()
-        //await cancelPerticularOpenOrder()
         let buy_grid = []
         let sell_grid = []
+
+        await cancelAllOpenOrder()
+        await cancelPerticularOpenOrder() 
 
         const result = await getCurrentPrice() 
         if (!result?.data?.close) return
@@ -431,6 +449,7 @@ async function init() {
         border_sell_profit_price = border_sell_price - buy_sell_profit_point
     
         total_error_count = 0   
+        current_running_order = ''
         
         console.log('==================BUY PROFIT BORDER==================',border_buy_profit_price)
         console.log('==================BUY BORDER==================',border_buy_price)
@@ -448,21 +467,23 @@ async function init() {
             is_update:false
         }))
  
-        buy_grid    =   generateGrid(border_buy_price,border_buy_profit_price,50)
-        sell_grid   =   generateGrid(border_sell_profit_price,border_sell_price,50)
-          
-        buy_grid.slice(0,3).forEach( async (stop_price)=>{
-            order_in_progress = false 
-            await createOrder('buy',stop_price,border_price,false,1)
-            await sleep(800)
-        })
-        sell_grid.slice(-3).forEach( async (stop_price)=>{
-            order_in_progress = false 
-            await createOrder('sell',stop_price,border_price,false,1)
-            await sleep(800)
-        })
+        buy_grid    =   generateGrid(border_buy_price,border_buy_profit_price,30)
+        sell_grid   =   generateGrid(border_sell_profit_price,border_sell_price,30)
+         
+        //console.log('buy_grid__',buy_grid)
+        //console.log('sell_grid__',sell_grid)
  
-
+        await Promise.all(
+            buy_grid.slice(0, 4).map(async (stop_price) => {
+                await createOrder('buy', stop_price, border_price, false, 1) 
+            })
+        )
+        await Promise.all(
+            sell_grid.slice(-4).map(async (stop_price) => {
+                await createOrder('sell', stop_price, border_price, false, 1) 
+            })
+        )
+ 
     }catch(error){
         sendEmail(error.message,`ERROR IN WHEN CALL INIT FUNCTION`)
     }

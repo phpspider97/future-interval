@@ -2,82 +2,106 @@ const axios = require('axios');
 
 let now = Math.floor(Date.now() / 1000); // current time in seconds
  //now = now - (60 * 24 * 60 * 60); // 30 days in seconds
-const thirtyDaysAgo = now - (2 * 24 * 60 * 60); // 30 days in seconds
+const thirtyDaysAgo = now - (30 * 24 * 60 * 60); // 30 days in seconds
 
 // console.log('Start (30 days ago):', thirtyDaysAgo);
 // console.log('End (now):', now);
 
 const API_URL = 'https://api.india.delta.exchange/v2/history/candles';
 const symbol = 'BTCUSD';
-const resolution = '5m';
+const resolution = '15m';
 const start = thirtyDaysAgo; // Replace with your desired UNIX timestamp
 const end = now;   // Replace with your desired UNIX timestamp
+let candles = {}
+
+async function getCandleData() {
+    try {
+        const response = await axios.get(API_URL, {
+        params: { symbol, resolution, start, end }
+        });
+
+        candles = response.data.result
+        return candles
+    }catch(error){
+        console.log(error)
+    }
+} 
+
+ 
+const { EMA } = require('technicalindicators');
+ 
+const EMA_FAST = 9;
+const EMA_SLOW = 21;
+
+let position = null; // 'long' | 'short' | null
+let entryPrice = 0;
+let trades = [];
+
+function calculateEMA(period, values) {
+  return EMA.calculate({ period, values });
+}
 
 async function backtest() {
-  try {
-    const response = await axios.get(API_URL, {
-      params: { symbol, resolution, start, end }
-    });
+    const candles = await getCandleData()
+  const closes = candles.map(c => c.close);
+  const fastEMA = calculateEMA(EMA_FAST, closes);
+  const slowEMA = calculateEMA(EMA_SLOW, closes);
 
-    const candles = response.data.result;
-    
-    let lot_size                =   [1, 3, 9, 27, 81, 243] 
-    let current_running_order   =   'sell'
-    let loss                    =   0
-    let profit                  =   0 
-    let candle_index            =   0
-    var lot_array_count         =   0 
-    let trading_fees_one_lot    =   0.05
-    let loss_one_lot            =   0.1
-    let profit_one_lot          =   0.2
-    let crossCount              =   -1;
-    let loss_arr                =   []
-    let profite_arr              =   []
+  for (let i = EMA_SLOW + 1; i < candles.length; i++) {
+    const prevFast = fastEMA[i - EMA_SLOW - 1];
+    const prevSlow = slowEMA[i - EMA_SLOW - 1];
+    const currFast = fastEMA[i - EMA_SLOW];
+    const currSlow = slowEMA[i - EMA_SLOW];
+    const currentPrice = closes[i];
 
-    //console.log('candles___',candles)
-    console.clear();
-    for (const candle of candles) { 
-        if(lot_array_count>3){ lot_array_count = 0 }
-        crossCount++
-        let closePrice                  =   candle.open;
-        let first_close_caldle          =   candles[candle_index].open; 
-        let sell_stop_loss              =   first_close_caldle-100
-        let buy_stop_loss               =   first_close_caldle
-        let border_buy_profit_price     =   first_close_caldle+200
-        let border_sell_profit_price    =   first_close_caldle-100-200
-       
-        if(current_running_order == 'sell' && closePrice < sell_stop_loss){ 
-            current_running_order = 'buy'
-            loss += ( (loss_one_lot  + trading_fees_one_lot ) * lot_size[lot_array_count]) 
-            lot_array_count++
-        }
-        
-        if(current_running_order == 'buy' && closePrice > buy_stop_loss){
-            current_running_order = 'sell'
-            loss += ( loss_one_lot * lot_size[lot_array_count] + trading_fees_one_lot * lot_size[lot_array_count] )
-            lot_array_count++ 
-        }
-          
-        if (closePrice > border_buy_profit_price || closePrice < border_sell_profit_price) {
-            current_running_order = 'sell'
-            candle_index = crossCount
-            profit += ( profit_one_lot * lot_size[lot_array_count] - trading_fees_one_lot * lot_size[lot_array_count] )  
-            lot_array_count = 0  
-        }
+    if (prevFast < prevSlow && currFast > currSlow) {
+      if (position === 'short') {
+        trades.push({ type: 'short', entry: entryPrice, exit: currentPrice, pnl: entryPrice - currentPrice });
+        position = null;
+      }
+      if (position !== 'long') {
+        position = 'long';
+        entryPrice = currentPrice;
+      }
     }
 
-    //console.log('loss_arr____',loss_arr)
-    //console.log('profite_arr____',profite_arr)
-    //const total_loss_arr = loss_arr.reduce((total, num) => total + num, 0);
-    //const total_profite_arr = profite_arr.reduce((total, num) => total + num, 0);
-
-    console.log('COUNT : '  , crossCount);
-    console.log('GAIN : '   , profit.toFixed(2));
-    console.log('LOSS :   ', loss.toFixed(2));
-    console.log('PROFIT :   ',(profit-loss).toFixed(2));
-  } catch (error) {
-    console.error('Error fetching or processing data:', error.message);
+    if (prevFast > prevSlow && currFast < currSlow) {
+      if (position === 'long') {
+        trades.push({ type: 'long', entry: entryPrice, exit: currentPrice, pnl: currentPrice - entryPrice });
+        position = null;
+      }
+      if (position !== 'short') {
+        position = 'short';
+        entryPrice = currentPrice;
+      }
+    }
   }
+
+  // Close open position at last price
+  if (position !== null) {
+    const finalPrice = closes[closes.length - 1];
+    const pnl = position === 'long' ? finalPrice - entryPrice : entryPrice - finalPrice;
+    trades.push({ type: position, entry: entryPrice, exit: finalPrice, pnl });
+  }
+
+  analyzeResults(trades);
+}
+
+function analyzeResults(trades) {
+  let totalPnL = 0;
+  let wins = 0;
+  let losses = 0;
+
+  trades.forEach(t => {
+    totalPnL += t.pnl;
+    if (t.pnl > 0) wins++;
+    else losses++;
+  });
+
+  console.log(`Total Trades: ${trades.length}`);
+  console.log(`Wins: ${wins}, Losses: ${losses}`);
+  console.log(`Net PnL: $${totalPnL.toFixed(2)}`);
+  console.log(`Win Rate: ${(wins / trades.length * 100).toFixed(2)}%`);
 }
 
 backtest();

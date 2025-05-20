@@ -5,7 +5,7 @@ const path = require("path");
 const { futureEmitter } = require("./future/future"); 
 const { optionEmitter } = require("./option/option"); 
 const { gridEmitter } = require("./grid/grid"); 
-// const { crossEmitter } = require("./cross/cross"); 
+const { crossEmitter } = require("./cross/cross"); 
 // const { superTrendEmitter } = require("./super-trend/super-trend"); 
  
 const app = express();
@@ -40,13 +40,13 @@ app.get('/grid', (req, res) => {
 //==============================GRID==================================
 
 //==============================CROSS==================================
-// crossEmitter.on("cross_trade_info", (data) => {  
-//     //console.log('data__',data)
-//     io.emit("cross_trade_info", data)
-// })  
-// app.get('/cross', (req, res) => {  
-//     res.sendFile(path.join(__dirname, 'public', 'cross.html'));
-// }) 
+crossEmitter.on("cross_trade_info", (data) => {  
+    //console.log('data__',data)
+    io.emit("cross_trade_info", data)
+})  
+app.get('/cross', (req, res) => {  
+    res.sendFile(path.join(__dirname, 'public', 'cross.html'));
+}) 
 //==============================CROSS==================================
 
 //==============================SUPER TREND==================================
@@ -78,12 +78,12 @@ io.on("connection", (socket) => {
     socket.on("grid_stop", () => { 
         gridEmitter.emit("grid_stop")
     })
-    // socket.on("cross_start", () => { 
-    //     crossEmitter.emit("cross_start")
-    // })
-    // socket.on("cross_stop", () => { 
-    //     crossEmitter.emit("cross_stop")
-    // })
+    socket.on("cross_start", () => { 
+        crossEmitter.emit("cross_start")
+    })
+    socket.on("cross_stop", () => { 
+        crossEmitter.emit("cross_stop")
+    })
     // socket.on("super_trend_start", () => { 
     //     superTrendEmitter.emit("super_trend_start")
     // })

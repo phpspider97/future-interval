@@ -250,7 +250,7 @@ async function getBalance() {
         const response = await axios.get(`${API_URL}/v2/wallet/balances`, { headers })
         //console.log('response : ',response.data)
         return response.data.result[0].balance_inr
-    } catch (err) {
+    } catch (error) {
         sendEmail(error.message,`ERROR IN WHEN GET BALANCE`)
     }
 }

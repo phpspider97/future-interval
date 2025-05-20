@@ -48,6 +48,7 @@ let cross_over_type                 = ''
 let total_error_count               = 0
 let number_of_time_order_executed   = 0
 let current_running_order           = ''
+let create_order_error              =   {}
 
 async function fetchCandles() {
     const end_time_stamp = Math.floor(Date.now() / 1000)
@@ -182,6 +183,7 @@ async function createOrder(bid_type) {
             side: bid_type,   
             order_type: "market_order", 
         }
+        create_order_error = bodyParams
         const signaturePayload = `POST${timestamp}/v2/orders${JSON.stringify(bodyParams)}`;
         const signature = await generateEncryptSignature(signaturePayload);
 

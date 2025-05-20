@@ -268,12 +268,13 @@ async function createOrder(product_id,bitcoin_option_symbol) {
     try { 
         const timestamp = Math.floor(Date.now() / 1000);
         const bodyParams = {
-            product_id: product_id, 
-            product_symbol: bitcoin_option_symbol, 
+            product_id: product_id??0, 
+            product_symbol: bitcoin_option_symbol??'', 
             size: lot_size_array[number_of_time_order_executed],
             side: 'sell', 
             order_type: "market_order"
         } 
+ 
         body_param_for_testing = bodyParams
         const signaturePayload = `POST${timestamp}/v2/orders${JSON.stringify(bodyParams)}`;
         const signature = await generateEncryptSignature(signaturePayload);
@@ -354,9 +355,8 @@ async function getCurrentPriceOfBitcoin(data_type) {
     try {
         additional_profit_buy_price = 0 
         const expiry_date = getAdjustedDate()  
-        const response = await axios.get(`${API_URL}/v2/tickers/?underlying_asset_symbols=BTC&contract_types=call_options,put_options&states=live&expiry_date=23-05-2025`)
-        const allProducts = response.data.result;
-        
+        const response = await axios.get(`${API_URL}/v2/tickers/?underlying_asset_symbols=BTC&contract_types=call_options,put_options&states=live&expiry_date=21-05-2025`)
+        const allProducts = response.data.result; 
         const spot_price = Math.round(allProducts[0].spot_price / 200) * 200
         bitcoin_current_price = Math.round(allProducts[0].spot_price);
         let option_data = []

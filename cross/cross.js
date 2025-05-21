@@ -2,7 +2,7 @@ const axios = require('axios')
 require('dotenv').config()
 const crypto = require('crypto');
 const SYMBOL = 'BTCUSD'
-const INTERVAL = '15m'
+const INTERVAL = '5m'
 const fs = require('fs')
 const nodemailer = require('nodemailer') 
 const { EMA } = require('technicalindicators')
@@ -23,7 +23,7 @@ function sendEmail(message,subject){
     //return true 
     let mailOptions = {
         from: 'phpspider97@gmail.com',
-        to: 'neelbhardwaj97@gmail.com',
+        to: 'allinonetrade0009@gmail.com',
         subject: 'CROSS BOT : ' +subject,
         html: message
     }

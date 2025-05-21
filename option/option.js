@@ -30,7 +30,7 @@ function sendEmail(message,subject){
  
     let mailOptions = {
         from: 'phpspider97@gmail.com',
-        to: 'neelbhardwaj97@gmail.com',
+        to: 'allinonetrade0009@gmail.com',
         subject: 'OPTION BOT : ' +subject,
         html: message
     }

@@ -101,12 +101,12 @@ async function checkCrossOver(){
         }
         //console.log('order_type___',order_type)
         if (previousEMA9 < previousEMA21 && currentEMA9 > currentEMA21) {
-            console.log('Bullish crossover (EMA9 crossed above EMA21)')
+            //console.log('Bullish crossover (EMA9 crossed above EMA21)')
             order_type = 'Buy'
             cross_over_type = 'Bullish'
             await createOrder('buy')
         } else if (previousEMA9 > previousEMA21 && currentEMA9 < currentEMA21) {
-            console.log('Bearish crossover (EMA9 crossed below EMA21)');
+            //console.log('Bearish crossover (EMA9 crossed below EMA21)');
             order_type = 'Sell'
             cross_over_type = 'Bearish'
             await createOrder('sell')
@@ -179,7 +179,7 @@ async function createOrder(bid_type) {
         const bodyParams = {
             product_id: bitcoin_product_id,
             product_symbol: "BTCUSD",
-            size: 1, 
+            size: (current_running_order == '')?1:2, 
             side: bid_type,   
             order_type: "market_order", 
         }

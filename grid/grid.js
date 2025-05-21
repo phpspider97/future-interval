@@ -109,20 +109,20 @@ function wsConnect() {
                 ws.close(1000, 'Too many errors');
             }
             if(message.type == "orders"){
-                console.log('')
-                console.log('message___',JSON.stringify(message))
-                console.log('')
+                // console.log('')
+                // console.log('message___',JSON.stringify(message))
+                // console.log('')
                 if(message.state == 'closed' && message.meta_data.pnl != undefined){  
                     const side = message.side
                     const order_at = parseInt(message.limit_price)
                     
                     const update_order_price = (side == 'buy')?order_at+profit_margin:order_at-profit_margin 
                     if(!is_price_out_of_grid){
-                        console.log('update_order_price___',side,order_at,update_order_price)
+                        //console.log('update_order_price___',side,order_at,update_order_price)
                         await createOrder((side == 'buy')?'sell':'buy',update_order_price)
                     }
 
-                    sendEmail('',`ONE ${side} SIDE STOP ORDER TRIGGERED AT ${order_at}`)
+                    sendEmail('',`ONE ${side.toUpperCase()} SIDE STOP ORDER TRIGGERED AT ${order_at}`)
                 }
             } 
             if(message.type == "v2/ticker"){

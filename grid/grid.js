@@ -65,6 +65,7 @@ let roundedToHundred                =   (price) => Math.round(price / 100) * 100
 let reconnectInterval               =   2000
 let order_in_progress               =   false 
 let is_price_out_of_grid            =   false
+let body_param_for_testing          =   {}
 
 function wsConnect() { 
     const WEBSOCKET_URL = SOCKET_URL
@@ -304,6 +305,7 @@ async function createOrder(bid_type,order_price){
             order_type : "limit_order",
             limit_price : order_price
         } 
+        body_param_for_testing = bodyParams
         const signaturePayload = `POST${timestamp}/v2/orders${JSON.stringify(bodyParams)}`;
         const signature = await generateEncryptSignature(signaturePayload);
 
@@ -322,7 +324,7 @@ async function createOrder(bid_type,order_price){
         }
         return { message: "Order failed", status: false }
     } catch (error) {
-        sendEmail(error.message,`ERROR IN WHEN CREATING ORDER`) 
+        sendEmail(error.message +' '+JSON.stringify(body_param_for_testing),`ERROR IN WHEN CREATING ORDER`) 
         total_error_count++ 
         order_in_progress = false;  
         return { message: error?.message, status: false }

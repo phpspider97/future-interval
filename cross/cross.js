@@ -19,20 +19,33 @@ let transporter = nodemailer.createTransport({
       pass: process.env.USER_PASSWORD
     },
 })  
+const lastSentTimestamps = {}
+const THROTTLE_INTERVAL_MS = 60 * 1000
 function sendEmail(message,subject){
-    //return true 
-    let mailOptions = {
-        from: 'phpspider97@gmail.com',
-        to: 'allinonetrade0009@gmail.com',
-        subject: 'CROSS BOT : ' +subject,
-        html: message
-    }
-    transporter.sendMail(mailOptions, (error, info) => {
-        if (error) {
-            return console.log('Error:', error);
+    try{
+        const now = Date.now();
+        const subjectKey = subject.trim().toLowerCase();
+        if (lastSentTimestamps[subjectKey] && now - lastSentTimestamps[subjectKey] < THROTTLE_INTERVAL_MS) {
+            console.log(`Throttled: Email with subject "${subject}" was sent recently.`);
+            return;
         }
-        console.log('Email sent:', info.response);
-    });
+        lastSentTimestamps[subjectKey] = now;
+    
+        let mailOptions = {
+            from: 'phpspider97@gmail.com',
+            to: 'allinonetrade0009@gmail.com',
+            subject: 'CROSS BOT : ' +subject,
+            html: message
+        }
+        transporter.sendMail(mailOptions, (error, info) => {
+            if (error) {
+                return console.log('Error:', error);
+            }
+            console.log('Email sent:', info.response);
+        })
+    }catch(error){
+        console.log('EMAIL ERROR : ', error.message)
+    }
 }
 
 const API_URL       =   process.env.API_URL 

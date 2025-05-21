@@ -17,7 +17,7 @@ let transporter = nodemailer.createTransport({
     },
 })  
 function sendEmail(message,subject){
-    //return true 
+    return true 
     let mailOptions = {
         from: 'phpspider97@gmail.com',
         to: 'allinonetrade0009@gmail.com',

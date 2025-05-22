@@ -228,12 +228,12 @@ async function cancelAllOpenOrder() {
 function sleep(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
 }
-
+ 
 async function setRangeLimitOrder() {
     try {
         await cancelAllOpenOrder()
         const response = await axios.get(`${API_URL}/v2/tickers/BTCUSD`);
-        const current_price = Math.round(response.data.result.close);  
+        const current_price = Math.round(response?.data?.result?.close);  
         bitcoin_product_id = response.data.result.product_id;
         let round_of_current_price = roundedToHundred(current_price)
         //console.log('round_of_current_price___',round_of_current_price)

@@ -26,7 +26,7 @@ function sendEmail(message,subject){
     const now = Date.now();
     const subjectKey = subject.trim().toLowerCase();
     if (lastSentTimestamps[subjectKey] && now - lastSentTimestamps[subjectKey] < THROTTLE_INTERVAL_MS) {
-        console.log(`Throttled: Email with subject "${subject}" was sent recently.`);
+        console.log(`OPTION BOT : Throttled: Email with subject "${subject}" was sent recently.`);
         return;
     }
     lastSentTimestamps[subjectKey] = now;

@@ -29,7 +29,7 @@ function sendEmail(message,subject){
         const now = Date.now();
         const subjectKey = subject.trim().toLowerCase();
         if (lastSentTimestamps[subjectKey] && now - lastSentTimestamps[subjectKey] < THROTTLE_INTERVAL_MS) {
-            console.log(`Throttled: Email with subject "${subject}" was sent recently.`);
+            console.log(`CROSS BOT : Throttled: Email with subject "${subject}" was sent recently.`);
             return;
         }
         lastSentTimestamps[subjectKey] = now;
@@ -119,16 +119,17 @@ async function checkCrossOver(){
         // }
         //console.log('order_type___',order_type)
         if (previousEMA9 < previousEMA21 && currentEMA9 > currentEMA21) {
-            console.log('Bullish crossover (EMA9 crossed above EMA21)')
+            //console.log('Bullish')
             order_type = 'Buy'
             cross_over_type = 'Bullish' 
             await createOrder('buy')
         } else if (previousEMA9 > previousEMA21 && currentEMA9 < currentEMA21) {
-            console.log('Bearish crossover (EMA9 crossed below EMA21)');
+            //console.log('Bearish');
             order_type = 'Sell'
             cross_over_type = 'Bearish'
             await createOrder('sell')
         } else { 
+            //console.log('Neutral');
             order_type = 'Neutral' 
             cross_over_type = 'Neutral'
         }

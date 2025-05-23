@@ -4,27 +4,39 @@ require('dotenv').config()
 const api_url = process.env.API_URL 
 const SYMBOL = 'BTCUSD'
 const INTERVAL = '5m'
+let previous_candle_data = []
  
-async function fetchCandles(limit = 100) {
-    const end_time_stamp = Math.floor(Date.now() / 1000)
-    const start_time_stamp = end_time_stamp - (6 * 60 * 60)
-    const response = await axios.get(`${api_url}/v2/history/candles`, {
-        params : { 
-            symbol : SYMBOL, 
-            resolution : INTERVAL, 
-            start : start_time_stamp, 
-            end : end_time_stamp 
-        }
-    });  
-
-  return response.data.result.reverse().map(candle => ({
-    time: candle.time,
-    open: parseFloat(candle.open),
-    high: parseFloat(candle.high),
-    low: parseFloat(candle.low),
-    close: parseFloat(candle.close),
-    volume: parseFloat(candle.volume)
-  }));
+async function fetchCandles() {
+    try{
+        const end_time_stamp = Math.floor(Date.now() / 1000)
+        const start_time_stamp = end_time_stamp - (6 * 60 * 60)
+        const response = await axios.get(`${api_url}/v2/history/candles`, {
+            params : { 
+                symbol : SYMBOL, 
+                resolution : INTERVAL, 
+                start : start_time_stamp, 
+                end : end_time_stamp 
+            }
+        });  
+        previous_candle_data = response.data.result.reverse()
+        return response.data.result.reverse().map(candle => ({
+            time: candle.time,
+            open: parseFloat(candle.open),
+            high: parseFloat(candle.high),
+            low: parseFloat(candle.low),
+            close: parseFloat(candle.close),
+            volume: parseFloat(candle.volume)
+        }))
+    }catch(error){
+        return previous_candle_data.map(candle => ({
+            time: candle.time,
+            open: parseFloat(candle.open),
+            high: parseFloat(candle.high),
+            low: parseFloat(candle.low),
+            close: parseFloat(candle.close),
+            volume: parseFloat(candle.volume)
+        })) 
+    }
 }
  
 async function classifyLastCandle() {

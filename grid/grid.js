@@ -300,7 +300,7 @@ async function createOrder(bid_type,order_price){
         const bodyParams = {
             product_id : bitcoin_product_id,
             product_symbol : "BTCUSD",
-            size : 1, 
+            size : 2, 
             side : bid_type,   
             order_type : "limit_order",
             limit_price : order_price

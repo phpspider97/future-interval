@@ -341,15 +341,14 @@ async function createOrder(product_id,bitcoin_option_symbol) {
  
 function getAdjustedDate() { 
     const now = new Date();
-    const istOffset = 5.5 * 60 * 60 * 1000;
     const istTime = new Date(now.getTime()); 
-    if (istTime.getHours() > 17 || (istTime.getHours() === 17 && istTime.getMinutes() >= 30)) {
-        istTime.setDate(istTime.getDate() + 1);
+    if (istTime.getHours() > 17 || (istTime.getHours() === 17 && istTime.getMinutes() >= 10)) {
+        istTime.setDate(istTime.getDate() + 1)
     }
     
-    const day = String(istTime.getDate()).padStart(2, '0');
-    const month = String(istTime.getMonth() + 1).padStart(2, '0'); // Months are zero-based
-    const year = istTime.getFullYear();
+    const day = String(istTime.getDate()).padStart(2, '0')
+    const month = String(istTime.getMonth() + 1).padStart(2, '0')
+    const year = istTime.getFullYear()
 
     return `${day}-${month}-${year}`
 }
@@ -358,12 +357,13 @@ async function getCurrentPriceOfBitcoin(data_type) {
     try {
         additional_profit_buy_price = 0 
         const expiry_date = getAdjustedDate()  
-
-        let tomorrow_date = new Date(Date.now() + 864e5)
+ 
+        let tomorrow_date = new Date(Date.now() + 2 * 864e5);
         tomorrow_date = `${String(tomorrow_date.getDate()).padStart(2, '0')}-${String(tomorrow_date.getMonth() + 1).padStart(2, '0')}-${tomorrow_date.getFullYear()}`
+         
+        const response = await axios.get(`${API_URL}/v2/tickers/?underlying_asset_symbols=BTC&contract_types=call_options,put_options&states=live&expiry_date=${expiry_date}`)
+        const allProducts = response.data.result;  
 
-        const response = await axios.get(`${API_URL}/v2/tickers/?underlying_asset_symbols=BTC&contract_types=call_options,put_options&states=live&expiry_date=${tomorrow_date}`)
-        const allProducts = response.data.result; 
         const spot_price = Math.round(allProducts[0].spot_price / 200) * 200
         bitcoin_current_price = Math.round(allProducts[0].spot_price);
         let option_data = []
@@ -379,7 +379,7 @@ async function getCurrentPriceOfBitcoin(data_type) {
             current_running_order = 'sell'  
             option_data = allProducts.filter(product =>
                 product.contract_type == 'put_options' && product.strike_price == spot_price-CANCEL_GAP
-            ); 
+            );  
             if(spot_price-bitcoin_current_price < 0 &&  Math.abs(bitcoin_current_price-spot_price)>20){
                 additional_profit_buy_price = 100 
             } 

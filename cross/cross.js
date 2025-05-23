@@ -57,14 +57,15 @@ const KEY           =   process.env.CROSS_WEB_KEY
 const SECRET        =   process.env.CROSS_WEB_SECRET 
 const USER_ID       =   process.env.CROSS_WEB_USER_ID
 
-let bitcoin_current_price           = 0 
-let order_type                      = ''
+let bitcoin_current_price           =   0 
+let order_type                      =   ''
 let cross_over_interval
-let cross_over_type                 = ''
-let total_error_count               = 0
-let number_of_time_order_executed   = 0
-let current_running_order           = ''
+let cross_over_type                 =   ''
+let total_error_count               =   0
+let number_of_time_order_executed   =   0
+let current_running_order           =   ''
 let create_order_error              =   {}
+let previous_candle_data            =   []
 
 async function fetchCandles() {
     const end_time_stamp = Math.floor(Date.now() / 1000)
@@ -81,11 +82,12 @@ async function fetchCandles() {
         }); 
         const candles = response.data.result 
         const closePrices = candles.map(c => parseFloat(c.close));
+        previous_candle_data = closePrices.reverse()
         return closePrices.reverse()
 
     } catch (err) {
         console.error('❌ Error fetching candles:', err.message);
-        return [];
+        return previous_candle_data
     }
 }
 
@@ -109,20 +111,20 @@ async function checkCrossOver(){
         const currentEMA21 = ema21[ema21.length - 1];
         const previousEMA21 = ema21[ema21.length - 2];
 
-        if(current_running_order == 'buy' && bitcoin_current_price < currentEMA21){
-            await cancelAllOpenOrder()
-        }
-        if(current_running_order == 'sell' && bitcoin_current_price > currentEMA21){
-            await cancelAllOpenOrder()
-        }
+        // if(current_running_order == 'buy' && bitcoin_current_price < currentEMA21){
+        //     await cancelAllOpenOrder()
+        // }
+        // if(current_running_order == 'sell' && bitcoin_current_price > currentEMA21){
+        //     await cancelAllOpenOrder()
+        // }
         //console.log('order_type___',order_type)
         if (previousEMA9 < previousEMA21 && currentEMA9 > currentEMA21) {
-            //console.log('Bullish crossover (EMA9 crossed above EMA21)')
+            console.log('Bullish crossover (EMA9 crossed above EMA21)')
             order_type = 'Buy'
-            cross_over_type = 'Bullish'
+            cross_over_type = 'Bullish' 
             await createOrder('buy')
         } else if (previousEMA9 > previousEMA21 && currentEMA9 < currentEMA21) {
-            //console.log('Bearish crossover (EMA9 crossed below EMA21)');
+            console.log('Bearish crossover (EMA9 crossed below EMA21)');
             order_type = 'Sell'
             cross_over_type = 'Bearish'
             await createOrder('sell')
@@ -185,13 +187,14 @@ async function cancelAllOpenOrder() {
  
 async function createOrder(bid_type) {
     try {  
-        await cancelAllOpenOrder()
         if(bid_type == current_running_order){
             return true
         }
         if(!is_live){
             return true
         }
+
+        await cancelAllOpenOrder()
         const timestamp = Math.floor(Date.now() / 1000);
         const bodyParams = {
             product_id: bitcoin_product_id,

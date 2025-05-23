@@ -341,16 +341,18 @@ async function createOrder(product_id,bitcoin_option_symbol) {
  
 function getAdjustedDate() { 
     const now = new Date();
-    const istTime = new Date(now.getTime()); 
+    const istOffset = 5.5 * 60;
+    const istTime = new Date(now.getTime() + (istOffset - now.getTimezoneOffset()) * 60000);
+   
     if (istTime.getHours() > 17 || (istTime.getHours() === 17 && istTime.getMinutes() >= 10)) {
-        istTime.setDate(istTime.getDate() + 1)
+      istTime.setDate(istTime.getDate() + 1);
     }
-    
-    const day = String(istTime.getDate()).padStart(2, '0')
-    const month = String(istTime.getMonth() + 1).padStart(2, '0')
-    const year = istTime.getFullYear()
-
-    return `${day}-${month}-${year}`
+  
+    const day = String(istTime.getDate()).padStart(2, '0');
+    const month = String(istTime.getMonth() + 1).padStart(2, '0');
+    const year = istTime.getFullYear();
+   
+    return `${day}-${month}-${year}`;
 }
 
 async function getCurrentPriceOfBitcoin(data_type) {

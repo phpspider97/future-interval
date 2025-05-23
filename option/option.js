@@ -20,7 +20,9 @@ let transporter = nodemailer.createTransport({
 const lastSentTimestamps = {}
 const THROTTLE_INTERVAL_MS = 60 * 1000
 function sendEmail(message,subject){
-    return true
+    if(!is_live){
+        return true
+    }
     const now = Date.now();
     const subjectKey = subject.trim().toLowerCase();
     if (lastSentTimestamps[subjectKey] && now - lastSentTimestamps[subjectKey] < THROTTLE_INTERVAL_MS) {
@@ -98,12 +100,12 @@ function wsConnect() {
         subscribe(ws, 'orders', ['all']);
         subscribe(ws, 'v2/ticker', ['BTCUSD']); 
     } else {
-        if(message.type == 'error'){
-            sendEmail(message.message,`IP ADDRESS ERROR`)
-            console.log("OPTION : " + message.message)
-        }
         if(!is_live){
             return true
+        }
+        if(message.type == 'error'){
+            sendEmail(message.message,`OPTION IP ADDRESS ERROR`)
+            console.log("OPTION : " + message.message)
         }
         if(total_error_count>3) { 
             is_live = false
@@ -356,7 +358,11 @@ async function getCurrentPriceOfBitcoin(data_type) {
     try {
         additional_profit_buy_price = 0 
         const expiry_date = getAdjustedDate()  
-        const response = await axios.get(`${API_URL}/v2/tickers/?underlying_asset_symbols=BTC&contract_types=call_options,put_options&states=live&expiry_date=21-05-2025`)
+
+        let tomorrow_date = new Date(Date.now() + 864e5)
+        tomorrow_date = `${String(tomorrow_date.getDate()).padStart(2, '0')}-${String(tomorrow_date.getMonth() + 1).padStart(2, '0')}-${tomorrow_date.getFullYear()}`
+
+        const response = await axios.get(`${API_URL}/v2/tickers/?underlying_asset_symbols=BTC&contract_types=call_options,put_options&states=live&expiry_date=${tomorrow_date}`)
         const allProducts = response.data.result; 
         const spot_price = Math.round(allProducts[0].spot_price / 200) * 200
         bitcoin_current_price = Math.round(allProducts[0].spot_price);

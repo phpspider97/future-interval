@@ -123,7 +123,7 @@ function wsConnect() {
                         await createOrder((side == 'buy')?'sell':'buy',update_order_price)
                     }
 
-                    sendEmail('',`ONE ${side.toUpperCase()} SIDE STOP ORDER TRIGGERED AT ${order_at}`)
+                    //sendEmail('',`ONE ${side.toUpperCase()} SIDE STOP ORDER TRIGGERED AT ${order_at}`)
                 }
             } 
             if(message.type == "v2/ticker"){

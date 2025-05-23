@@ -17,7 +17,9 @@ let transporter = nodemailer.createTransport({
     },
 })  
 function sendEmail(message,subject){
-    return true 
+    if(!is_live){
+        return true
+    }
     let mailOptions = {
         from: 'phpspider97@gmail.com',
         to: 'allinonetrade0009@gmail.com',
@@ -90,13 +92,14 @@ function wsConnect() {
         subscribe(ws, 'orders', ['all'])
         subscribe(ws, 'v2/ticker', ['BTCUSD'])
     } else {
-        if(message.type == 'error'){
-            sendEmail(message.message,`IP ADDRESS ERROR`)
-            console.log(message.message)
-        }
         if(!is_live){
             return true
         }
+        if(message.type == 'error'){
+            sendEmail(message.message,`FUTURE IP ADDRESS ERROR`)
+            console.log("FUTURE : " + message.message)
+        }
+       
         if(total_error_count>3) { 
             is_live = false
             fs.writeFileSync('./future/orderInfo.json', '', 'utf8')

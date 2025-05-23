@@ -22,6 +22,9 @@ let transporter = nodemailer.createTransport({
 const lastSentTimestamps = {}
 const THROTTLE_INTERVAL_MS = 60 * 1000
 function sendEmail(message,subject){
+    if(!is_live){
+        return true
+    }
     try{
         const now = Date.now();
         const subjectKey = subject.trim().toLowerCase();
@@ -182,6 +185,7 @@ async function cancelAllOpenOrder() {
  
 async function createOrder(bid_type) {
     try {  
+        await cancelAllOpenOrder()
         if(bid_type == current_running_order){
             return true
         }
@@ -192,7 +196,7 @@ async function createOrder(bid_type) {
         const bodyParams = {
             product_id: bitcoin_product_id,
             product_symbol: "BTCUSD",
-            size: (current_running_order == '')?1:2, 
+            size: 1, 
             side: bid_type,   
             order_type: "market_order", 
         }

@@ -330,7 +330,7 @@ async function createOrder(product_id,bitcoin_option_symbol) {
         }
         return { message: "Order failed", status: false };
     } catch (error) {
-        sendEmail(error.message + '' + JSON.stringify(body_param_for_testing),`ERROR IN WHEN CREATING ORDER`) 
+        sendEmail(error.message + ' ' + JSON.stringify(body_param_for_testing),`ERROR IN WHEN CREATING ORDER`) 
         total_error_count++ 
         order_in_progress = false; 
         return { message: error?.message, status: false };
@@ -375,7 +375,7 @@ async function getCurrentPriceOfBitcoin(data_type) {
             );
         }else if(data_type == 'put'){ 
             option_data = allProducts.filter(product =>
-                product.contract_type == 'put_options' && product.strike_price == border_sell_price-100
+                product.contract_type == 'put_options' && product.strike_price == border_sell_price
             );
         }else if(data_type == 'current'){
             current_running_order = 'sell'  

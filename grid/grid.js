@@ -103,8 +103,7 @@ function wsConnect() {
             if(!is_live){ 
                 return true
             } 
-            if(total_error_count > 3) { 
-                console.log('total_error_count',is_live)
+            if(total_error_count > 3) {  
                 is_live = false
                 fs.writeFileSync('./grid/orderInfo.json', '', 'utf8')
                 ws.close(1000, 'Too many errors');

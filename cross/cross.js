@@ -66,6 +66,7 @@ let number_of_time_order_executed   =   0
 let current_running_order           =   ''
 let create_order_error              =   {}
 let previous_candle_data            =   []
+let is_live                         =   false
 
 async function fetchCandles() {
     const end_time_stamp = Math.floor(Date.now() / 1000)

@@ -276,7 +276,8 @@ async function getBalance() {
     }
 }
  
-function init() { 
+async function init() { 
+    await cancelAllOpenOrder()
     is_live = (fs.statSync('./cross/orderInfo.json').size != 0)?true:false 
     //console.log('is_live___',is_live)
     if(is_live){

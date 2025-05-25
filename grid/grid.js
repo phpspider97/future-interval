@@ -135,7 +135,6 @@ function wsConnect() {
                     setTimeout(async () => {
                         sendEmail('',`GRID CREATE AGAIN AFTER 10 MINUTE`)
                         await setRangeLimitOrder()
-                        is_price_out_of_grid = false
                     }, 600000) // 10 min
                 }
                 triggerOrder(candle_current_price)
@@ -278,6 +277,8 @@ async function setRangeLimitOrder() {
             lower_price,
             grid_spacing,
         })) 
+
+        is_price_out_of_grid = false
     } catch (error) {
         sendEmail(error.message,`ERROR IN WHEN CANCEL ALL ORDER`)
         return { message: error.message, status: false };

@@ -56,7 +56,7 @@ const SOCKET_URL    =   process.env.API_URL_SOCKET
 const KEY           =   process.env.CROSS_WEB_KEY
 const SECRET        =   process.env.CROSS_WEB_SECRET 
 const USER_ID       =   process.env.CROSS_WEB_USER_ID
-
+ 
 let bitcoin_current_price           =   0 
 let order_type                      =   ''
 let cross_over_interval

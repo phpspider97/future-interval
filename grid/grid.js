@@ -127,7 +127,7 @@ function wsConnect() {
             } 
             if(message.type == "v2/ticker"){
                 let candle_current_price = message?.close
-                if (candle_current_price > upper_price+profit_margin || candle_current_price < lower_price-profit_margin && !is_price_out_of_grid ) {
+                if ( (candle_current_price > upper_price+profit_margin || candle_current_price < lower_price-profit_margin) && !is_price_out_of_grid ) {
                     is_price_out_of_grid = true
                     sendEmail('',`PRICE OUT OF THE GRID NOW GRID STOP FOR 10 MINUTE`)
                     await cancelAllOpenOrder()

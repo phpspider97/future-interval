@@ -414,10 +414,10 @@ gridEmitter.on("grid_start", async () => {
 })
 
 gridEmitter.on("grid_stop", async () => { 
+    is_live = false 
     await cancelAllOpenOrder() 
     fs.writeFileSync('./grid/orderInfo.json', '', 'utf8')
     sendEmail('',`BOT STOP BUTTON PRESSED`)
-    is_live = false 
 })
 
 module.exports = { gridEmitter }

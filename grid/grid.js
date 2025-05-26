@@ -219,7 +219,7 @@ async function cancelAllOpenOrder() {
         return { data: response.data, status: true };
     } catch (error) {
         sendEmail(error.message,`ERROR IN WHEN CANCEL ALL ORDER`)
-        return { message: error.message, status: false };
+        return { message: error.message + ' ' + JSON.stringify(error.response?.data) , status: false };
     }
 }
 

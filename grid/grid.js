@@ -3,7 +3,7 @@ const crypto = require('crypto')
 require('dotenv').config()
 const WebSocket = require('ws')
 const fs = require('fs')
-const { classifyLastCandle } = require('./trend.js')
+//const { classifyLastCandle } = require('./trend.js')
 const nodemailer = require('nodemailer')
 
 const EventEmitter = require('events')
@@ -52,6 +52,9 @@ const KEY           =   process.env.GRID_WEB_KEY
 const SECRET        =   process.env.GRID_WEB_SECRET 
 const USER_ID       =   process.env.GRID_WEB_USER_ID
 
+let bitcoin_product_id              =   0
+let bitcoin_option_product_id       =   0
+let bitcoin_option_product_symbol   =   ''
 let is_live                         =   false
 let given_price_range               =   []
 let lower_price                     =   0 
@@ -66,6 +69,10 @@ let reconnectInterval               =   2000
 let order_in_progress               =   false 
 let is_price_out_of_grid            =   false
 let body_param_for_testing          =   {}
+let start_buy_option                =   0
+let stop_buy_option                 =   0
+let start_sell_option               =   0
+let stop_sell_option                =   0
 
 function wsConnect() { 
     const WEBSOCKET_URL = SOCKET_URL
@@ -80,10 +87,10 @@ function wsConnect() {
         type: 'subscribe',
         payload: {
             channels: [
-            {
-                name: channel,
-                symbols: symbols
-            }
+                {
+                    name: channel,
+                    symbols: symbols
+                }
             ]
         }
         };
@@ -107,21 +114,38 @@ function wsConnect() {
                 is_live = false
                 fs.writeFileSync('./grid/orderInfo.json', '', 'utf8')
                 ws.close(1000, 'Too many errors');
-            }
-            if(message.type == "orders"){
-                // console.log('')
-                // console.log('message___',JSON.stringify(message))
-                // console.log('')
+            } 
+            if(message.type == "orders"){  
                 if(message.state == 'closed' && message.meta_data.pnl != undefined){  
                     const side = message.side
                     const order_at = parseInt(message.limit_price)
                     
                     const update_order_price = (side == 'buy')?order_at+profit_margin:order_at-profit_margin 
-                    if(!is_price_out_of_grid){
-                        //console.log('update_order_price___',side,order_at,update_order_price)
+                    if(!is_price_out_of_grid){ 
                         await createOrder((side == 'buy')?'sell':'buy',update_order_price)
                     }
 
+                    if(start_buy_option == order_at && side == 'sell'){ 
+                        const result = await getCurrentPriceOfBitcoin('put')
+                        if (!result.status) return;
+                        bitcoin_option_product_id = result?.data?.option_data?.product_id
+                        bitcoin_option_product_symbol = result?.data?.option_data?.symbol
+                        await createOptionOrder(result?.data?.option_data?.product_id,result?.data?.option_data?.symbol)
+                    }
+                    if(stop_buy_option == order_at && side == 'buy'){
+                        await createOptionOrder(bitcoin_option_product_id,bitcoin_option_product_symbol,'buy')
+                    }
+                    if(start_sell_option == order_at && side == 'buy'){
+                        const result = await getCurrentPriceOfBitcoin('call')
+                        if (!result.status) return;
+                        bitcoin_option_product_id = result?.data?.option_data?.product_id
+                        bitcoin_option_product_symbol = result?.data?.option_data?.symbol
+                        await createOptionOrder(result?.data?.option_data?.product_id,result?.data?.option_data?.symbol)
+                    }
+                    if(stop_sell_option == order_at && side == 'sell'){
+                        await createOptionOrder(bitcoin_option_product_id,bitcoin_option_product_symbol,'buy')
+                    }
+                     
                     //sendEmail('',`ONE ${side.toUpperCase()} SIDE STOP ORDER TRIGGERED AT ${order_at}`)
                 }
             } 
@@ -233,8 +257,8 @@ async function setRangeLimitOrder() {
         const response = await axios.get(`${API_URL}/v2/tickers/BTCUSD`);
         const current_price = Math.round(response?.data?.result?.close);  
         bitcoin_product_id = response.data.result.product_id;
-        let round_of_current_price = roundedToHundred(current_price)
-        //console.log('round_of_current_price___',round_of_current_price)
+        let round_of_current_price = roundedToHundred(current_price) 
+        //console.log('round_of_current_price__1_',`${API_URL}/v2/tickers/BTCUSD`)
         upper_price       =  round_of_current_price + 1200
         lower_price       =  round_of_current_price - 1000
         grid_spacing      =  (upper_price - lower_price) / numberOfGrids;
@@ -278,6 +302,18 @@ async function setRangeLimitOrder() {
         })) 
 
         is_price_out_of_grid = false
+
+        start_buy_option    =   first_five[1].price
+        stop_buy_option     =   first_five[3].price
+        start_sell_option   =   last_five[3].price
+        stop_sell_option    =   last_five[1].price
+        console.log('create_option___',start_buy_option)
+        console.log('create_option___',stop_buy_option)
+        console.log('')
+        console.log('')
+        console.log('create_option___',start_sell_option)
+        console.log('stop_option___',stop_sell_option)
+
     } catch (error) {
         sendEmail(error.message,`ERROR IN WHEN CANCEL ALL ORDER`)
         return { message: error.message, status: false };
@@ -300,7 +336,7 @@ async function createOrder(bid_type,order_price){
         const bodyParams = {
             product_id : bitcoin_product_id,
             product_symbol : "BTCUSD",
-            size : 2, 
+            size : 1, 
             side : bid_type,   
             order_type : "limit_order",
             limit_price : order_price
@@ -333,6 +369,111 @@ async function createOrder(bid_type,order_price){
     }
 }
 
+async function createOptionOrder(product_id,bitcoin_option_symbol,side='sell') { 
+    if (order_in_progress){ 
+        return true
+    }
+    order_in_progress = true
+     
+    try { 
+        const timestamp = Math.floor(Date.now() / 1000);
+        const bodyParams = {
+            product_id: product_id??0, 
+            product_symbol: bitcoin_option_symbol??'', 
+            size: 8,
+            side: side, 
+            order_type: "market_order"
+        } 
+        
+        body_param_for_testing = bodyParams
+        const signaturePayload = `POST${timestamp}/v2/orders${JSON.stringify(bodyParams)}`;
+        const signature = await generateEncryptSignature(signaturePayload);
+
+        const headers = {
+            "api-key": KEY,
+            "signature": signature,
+            "timestamp": timestamp,
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+        };
+        const response = await axios.post(`${API_URL}/v2/orders`, bodyParams, { headers });
+        console.log('bodyParams___',bodyParams)
+        if (response.data.success) {  
+            const message_template = `<br /><br /><br />
+            <table border="1" cellpadding="8" cellspacing="3">
+                <tr>
+                    <td>Product Symbol</td>
+                    <td>:</td>
+                    <td>${bitcoin_option_symbol}</td> 
+                </tr>
+                <tr>
+                    <td>Size</td>
+                    <td>:</td>
+                    <td>8</td> 
+                </tr> 
+            </table>
+            ` 
+            sendEmail(message_template,`CREATE OPTION ORDER FROM LESS LOSS : ${bitcoin_option_symbol}`)
+            number_of_time_order_executed++
+            return { data: response.data, status: true }
+        }
+        return { message: "Order failed", status: false };
+    } catch (error) {
+        sendEmail(error.message + ' ' + JSON.stringify(body_param_for_testing),`ERROR IN WHEN CREATING OPTION ORDER IN GRID`) 
+        total_error_count++ 
+        order_in_progress = false; 
+        return { message: error?.message, status: false };
+    } finally {
+        order_in_progress = false;
+    }
+}
+ 
+function getAdjustedDate() { 
+    const now = new Date();
+    const istOffset = 5.5 * 60;
+    const istTime = new Date(now.getTime() + (istOffset - now.getTimezoneOffset()) * 60000);
+   
+    if (istTime.getHours() > 17 || (istTime.getHours() === 17 && istTime.getMinutes() >= 10)) {
+      istTime.setDate(istTime.getDate() + 1);
+    }
+  
+    const day = String(istTime.getDate()).padStart(2, '0');
+    const month = String(istTime.getMonth() + 1).padStart(2, '0');
+    const year = istTime.getFullYear();
+   
+    return `${day}-${month}-${year}`;
+}
+
+async function getCurrentPriceOfBitcoin(data_type) {
+    try { 
+        const expiry_date = getAdjustedDate()  
+   
+        const response = await axios.get(`${API_URL}/v2/tickers/?underlying_asset_symbols=BTC&contract_types=call_options,put_options&states=live&expiry_date=${expiry_date}`)
+        const allProducts = response.data.result
+        
+        const spot_price = Math.round(allProducts[0].spot_price / 200) * 200
+         
+        let option_data = []
+        if(data_type == 'call'){ 
+            option_data = allProducts.filter(product =>
+                product.contract_type == 'call_options' && product.strike_price == border_buy_price+400
+            );
+        }else if(data_type == 'put'){ 
+            option_data = allProducts.filter(product =>
+                product.contract_type == 'put_options' && product.strike_price == spot_price-400
+            );
+        } 
+         
+        const bitcoin_option_data = {
+            option_data : option_data[0]
+        } 
+        return { data: bitcoin_option_data, status: true }
+    } catch (error) {
+        sendEmail(error.message,`ERROR IN GETTING BITCOIN INFORMATION`) 
+        return { message: error.message, status: false }
+    }
+}
+
 async function getBalance() {
     try {   
         const timestamp = Math.floor(Date.now() / 1000)
@@ -352,8 +493,19 @@ async function getBalance() {
         sendEmail(error.message,`ERROR IN WHEN GET BALANCE`)
     }
 }
+ 
+(async function() {
+    // const result = await getCurrentPriceOfBitcoin('put')
+    // if (!result.status) return;
+    // bitcoin_option_product_id = result?.data?.option_data?.product_id
+    // bitcoin_option_product_symbol = result?.data?.option_data?.symbol
+    // console.log('bitcoin_option_product_id : ',bitcoin_option_product_id)
+    // await createOptionOrder(result?.data?.option_data?.product_id,result?.data?.option_data?.symbol,'sell')
+  
+    // setTimeout(async () => { 
+    //     await createOptionOrder(bitcoin_option_product_id,bitcoin_option_product_symbol,'buy')
+    // }, 10000)
 
-(function() { 
     is_live = (fs.statSync('./grid/orderInfo.json').size != 0)?true:false
     if(is_live){
         wsConnect()
@@ -385,7 +537,8 @@ async function socketEventInfo(current_price){
         order_data = fs.readFileSync('./grid/orderInfo.json', 'utf8')
         order_data = JSON.parse(order_data) 
     } 
-    let current_trend = await classifyLastCandle()
+    //let current_trend = await classifyLastCandle()
+    let current_trend = "Neutral"
     gridEmitter.emit("grid_trade_info", {
         balance : current_balance,
         product_symbol : "BTCUSD",
@@ -414,10 +567,10 @@ gridEmitter.on("grid_start", async () => {
 })
 
 gridEmitter.on("grid_stop", async () => { 
-    is_live = false 
     await cancelAllOpenOrder() 
     fs.writeFileSync('./grid/orderInfo.json', '', 'utf8')
     sendEmail('',`BOT STOP BUTTON PRESSED`)
+    is_live = false 
 })
 
 module.exports = { gridEmitter }

@@ -286,12 +286,12 @@ async function setRangeLimitOrder() {
 
         first_five.forEach(async (data)=>{
             order_in_progress = false
-            //await createOrder('buy',data.price)
+            await createOrder('buy',data.price)
             await sleep(500)
         })
         last_five.forEach(async (data)=>{
             order_in_progress = false
-            //await createOrder('sell',data.price)
+            await createOrder('sell',data.price)
             await sleep(500)
         })
          

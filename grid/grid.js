@@ -324,15 +324,15 @@ async function setRangeLimitOrder() {
         is_price_out_of_grid = false
 
         const update_range_order_wise = given_price_range.slice().sort((a, b) => b.price - a.price).map(item => item.price) 
-        // start_buy_option    =   update_range_order_wise[1]
-        // stop_buy_option     =   update_range_order_wise[2]
-        // stop_sell_option    =   update_range_order_wise[8]
-        // start_sell_option   =   update_range_order_wise[9]
+        start_buy_option    =   update_range_order_wise[1]
+        stop_buy_option     =   update_range_order_wise[2]
+        stop_sell_option    =   update_range_order_wise[9]
+        start_sell_option   =   update_range_order_wise[10]
 
-        start_buy_option    =   update_range_order_wise[3]
-        stop_buy_option     =   update_range_order_wise[4]
-        stop_sell_option    =   update_range_order_wise[6]
-        start_sell_option   =   update_range_order_wise[7]
+        // start_buy_option    =   update_range_order_wise[3]
+        // stop_buy_option     =   update_range_order_wise[4]
+        // stop_sell_option    =   update_range_order_wise[6]
+        // start_sell_option   =   update_range_order_wise[7]
  
         console.log('update_range_order_wise',update_range_order_wise) 
         console.log('create_buy_option___',start_buy_option)

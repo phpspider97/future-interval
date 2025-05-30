@@ -326,8 +326,8 @@ async function setRangeLimitOrder() {
         const update_range_order_wise = given_price_range.slice().sort((a, b) => b.price - a.price).map(item => item.price) 
         start_buy_option    =   update_range_order_wise[1]
         stop_buy_option     =   update_range_order_wise[2]
-        stop_sell_option    =   update_range_order_wise[9]
-        start_sell_option   =   update_range_order_wise[10]
+        stop_sell_option    =   update_range_order_wise[8]
+        start_sell_option   =   update_range_order_wise[9]
 
         // start_buy_option    =   update_range_order_wise[3]
         // stop_buy_option     =   update_range_order_wise[4]

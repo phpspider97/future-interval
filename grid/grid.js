@@ -409,7 +409,7 @@ async function createOptionOrder(product_id,bitcoin_option_symbol,side='sell') {
         const bodyParams = {
             product_id: product_id??0, 
             product_symbol: bitcoin_option_symbol??'', 
-            size: 8,
+            size: 4,
             side: side, 
             order_type: "market_order"
         } 

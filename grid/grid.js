@@ -62,7 +62,7 @@ let upper_price                     =   0
 let grid_spacing                    =   0
 let numberOfGrids                   =   11
 let profit_margin                   =   200
-let stoploss_both_side              =   400
+let stoploss_both_side              =   100
 let total_error_count               =   0 
 let number_of_time_order_executed   =   0
 let roundedToHundred                =   (price) => Math.round(price / 100) * 100
@@ -171,7 +171,7 @@ function wsConnect() {
             } 
             if(message.type == "v2/ticker"){
                 let candle_current_price = message?.close
-                if ( (candle_current_price > upper_price+stoploss_both_side || candle_current_price < lower_price-stoploss_both_side) && !is_price_out_of_grid ) {
+                if ( (candle_current_price > given_price_range[given_price_range.length-1]+stoploss_both_side || candle_current_price < given_price_range[0]-stoploss_both_side) && !is_price_out_of_grid ) {
                     is_price_out_of_grid = true
                     sendEmail('',`PRICE OUT OF THE GRID NOW GRID STOP FOR 10 MINUTE`)
                     await cancelAllOpenOrder()
@@ -409,7 +409,7 @@ async function createOptionOrder(product_id,bitcoin_option_symbol,side='sell') {
         const bodyParams = {
             product_id: product_id??0, 
             product_symbol: bitcoin_option_symbol??'', 
-            size: 4,
+            size: 10,
             side: side, 
             order_type: "market_order"
         } 
@@ -490,11 +490,11 @@ async function getCurrentPriceOfBitcoin(data_type) {
         let option_data = []
         if(data_type == 'call'){ 
             option_data = allProducts.filter(product =>
-                product.contract_type == 'call_options' && product.strike_price == spot_price+400
+                product.contract_type == 'call_options' && product.strike_price == spot_price+600
             );
         }else if(data_type == 'put'){ 
             option_data = allProducts.filter(product =>
-                product.contract_type == 'put_options' && product.strike_price == spot_price-400
+                product.contract_type == 'put_options' && product.strike_price == spot_price-600
             );
         } 
         const bitcoin_option_data = {

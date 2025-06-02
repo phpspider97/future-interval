@@ -3,7 +3,7 @@ const crypto = require('crypto')
 require('dotenv').config()
 const WebSocket = require('ws')
 const nodemailer = require('nodemailer')   
-//const { findCandleTrend } = require('./trend.js')
+const { findCandleTrend } = require('./trend.js')
 const fs = require('fs')
 
 const EventEmitter = require('events');
@@ -17,8 +17,6 @@ let transporter = nodemailer.createTransport({
     },
 })  
 function sendEmail(message,subject){
-    console.log('message : ',message)
-    return true
     if(!is_live){
         return true
     }
@@ -38,9 +36,9 @@ function sendEmail(message,subject){
 
 const API_URL       =   process.env.API_URL 
 const SOCKET_URL    =   process.env.API_URL_SOCKET 
-const KEY           =   process.env.OPTION_WEB_KEY
-const SECRET        =   process.env.OPTION_WEB_SECRET 
-const USER_ID       =   process.env.OPTION_WEB_USER_ID
+const KEY           =   process.env.FUTURE_WEB_KEY
+const SECRET        =   process.env.FUTURE_WEB_SECRET 
+const USER_ID       =   process.env.FUTURE_WEB_USER_ID
 
 let lot_size_array                  =    [1, 1, 1] 
 let is_live                         =    false
@@ -62,15 +60,6 @@ let number_of_time_order_executed   =    0
 let extra_buy_range                 =    0
 let extra_sell_range                =    0
 let create_order_error              =   {}
-let given_price_range               =   []
-let lower_price                     =   0 
-let upper_price                     =   0 
-let grid_spacing                    =   0
-let numberOfGrids                   =   11
-let profit_margin                   =   200
-let is_price_out_of_grid            =   false
-let current_lock_price              =   0
-let current_order_status            =   ''
 
 
 function wsConnect() { 
@@ -116,30 +105,139 @@ function wsConnect() {
             fs.writeFileSync('./future/orderInfo.json', '', 'utf8')
             ws.close(1000, 'Too many errors');
         }    
-        if(message.type == "orders"){  
+        if(message.type == "orders"){
+            // console.log('') 
+            // console.log('message__',JSON.stringify(message))
+            // console.log('') 
             if(message.state == 'closed' && message.meta_data.pnl != undefined){  
-                const side = message.side  
-                const order_at = parseInt(message.limit_price)
+                //console.log('message___',JSON.stringify(message))
+                let order_fill_at = message?.average_fill_price
+                let side = message?.side
+                let size = message?.size
+                let is_update = false
+                current_running_order = side
+  
+                await cancelPerticularOpenOrder()
 
-                current_lock_price      =  (side == 'buy')?order_at-100:order_at+100
-                current_order_status    =   side
+                if(message.meta_data.pnl > 0){
+                    sendEmail('',`PROFIT IN ORDER : ${size} LOT OF ${side.toUpperCase()} PROFIT OF $${message.meta_data.pnl}`)
+                    await init()
+                    return false
+                }
+                if(message.meta_data.pnl < 0){
+                    sendEmail('',`LOSS IN ORDER : ${size} LOT OF ${side.toUpperCase()} LOSS OF $${message.meta_data.pnl}`)
+                    await init()
+                    return false
+                }
+
+                sendEmail('',`CREATE ${size} LOT OF ${side.toUpperCase()} ORDER AT ${order_fill_at}`)
+ 
+                if(side == 'sell'){
+                    let order_fill_difference = border_sell_price-order_fill_at
+                    if(order_fill_difference>20){
+                        is_update = true
+                        border_buy_price -= order_fill_difference 
+                        border_buy_profit_price -= order_fill_difference
+                        border_price -= order_fill_difference
+                        border_sell_price -= order_fill_difference
+                        border_sell_profit_price -= order_fill_difference
+                    } 
+ 
+                    let buy_grid    =   generateGrid(border_buy_price,border_buy_profit_price,30)
+                    let sell_grid   =   generateGrid(border_sell_profit_price-180,border_sell_profit_price,30)
+
+                    await Promise.all(
+                        buy_grid.slice(0, 4).map(async (stop_price) => {
+                            await createOrder('buy', stop_price, border_price, false, size) 
+                        })
+                    )
+                    await Promise.all(
+                        sell_grid.slice(-4).map(async (stop_price) => {
+                            await createOrder('buy', stop_price, border_price, true, size) 
+                        })
+                    )
+                    // buy_grid.slice(0,4).forEach( async (stop_price)=>{
+                    //     order_in_progress = false 
+                    //     await createOrder('buy',stop_price,border_price,false,size)
+                    //     await sleep(100)
+                    // })
+                    // sell_grid.slice(-4).forEach( async (stop_price)=>{
+                    //     order_in_progress = false 
+                    //     await createOrder('buy',stop_price,border_price,true,size)
+                    //     await sleep(100)
+                    // })
+                }
+                if(side == 'buy'){
+                    let order_fill_difference = order_fill_at-border_buy_price
+                    if(order_fill_difference>20){
+                        is_update = true
+                        border_buy_price += order_fill_difference 
+                        border_buy_profit_price += order_fill_difference
+                        border_price += order_fill_difference
+                        border_sell_price += order_fill_difference
+                        border_sell_profit_price += order_fill_difference
+                    } 
+  
+                    let buy_grid  =  generateGrid(border_buy_profit_price,border_buy_profit_price+180,30)
+                    let sell_grid   =   generateGrid(border_sell_profit_price,border_sell_price ,30)
+
+                    await Promise.all(
+                        buy_grid.slice(0, 4).map(async (stop_price) => {
+                            await createOrder('sell', stop_price, border_price, true, size) 
+                        })
+                    )
+                    await Promise.all(
+                        sell_grid.slice(-4).map(async (stop_price) => {
+                            await createOrder('sell', stop_price, border_price, false, size) 
+                        })
+                    )
+
+                    // buy_grid.slice(0,4).forEach( async (stop_price)=>{
+                    //     order_in_progress = false 
+                    //     await createOrder('sell',stop_price,border_price,true,size)
+                    //     await sleep(100)
+                    // })
+
+                    // sell_grid.slice(-4).forEach( async (stop_price)=>{
+                    //     order_in_progress = false 
+                    //     await createOrder('sell',stop_price,border_price,false,size)
+                    //     await sleep(100)
+                    // })
+                }
+
+                if(is_update){ 
+                    updateOrderInfo(JSON.stringify({
+                        bitcoin_product_id,
+                        border_buy_profit_price,
+                        border_buy_price,
+                        border_price,
+                        border_sell_price,
+                        border_sell_profit_price,
+                        is_update:true
+                    }))
+                }
             }
-        } 
+        }
         if(message.type == "v2/ticker"){
             let candle_current_price = message?.close
-            if ( (candle_current_price > given_price_range[given_price_range.length-1] || candle_current_price < given_price_range[0]) && !is_price_out_of_grid ) {
-                is_price_out_of_grid = true
-                sendEmail('',`PRICE OUT OF THE GRID NOW GRID STOP FOR 10 MINUTE`) 
-                await init()
+            if(is_break_time == true){
+                return true
+            }
+            
+            if(current_running_order == 'sell'){
+                extra_buy_range = -60
+                extra_sell_range = 110
             }
 
-            if(current_order_status == 'sell' &&  candle_current_price > current_lock_price){
+            if(current_running_order == 'buy'){
+                extra_buy_range = 110
+                extra_sell_range = -60
+            }
+
+            if (candle_current_price > border_buy_profit_price+extra_buy_range || candle_current_price < border_sell_profit_price-extra_sell_range ) {
                 await init()
             }
-            if(current_order_status == 'buy' && current_lock_price < candle_current_price){
-                await init()
-            }
-            triggerOrder(candle_current_price)
+            await triggerOrder(candle_current_price)
         } 
     } 
   } 
@@ -213,7 +311,6 @@ async function generateEncryptSignature(signaturePayload) {
 
 async function cancelAllOpenOrder() {
     try {
-        given_price_range = [];
         current_running_order = ''
         const timestamp = Math.floor(Date.now() / 1000)
         const bodyParams = {
@@ -238,8 +335,15 @@ async function cancelAllOpenOrder() {
     }
 }
 
-async function createOrder(bidType,order_price,is_limit_order=false,size) {
-    try {  
+async function createOrder(bidType,order_price,bitcoin_current_price,is_limit_order=false,size) {
+    try { 
+        // let current_trend = await findCandleTrend() 
+        // if(bidType == 'sell' && (current_trend == 'neutral' || current_trend == 'bull') ){
+        //     return true
+        // }
+        // if(bidType == 'buy' && (current_trend == 'neutral' || current_trend == 'bear') ){
+        //     return true
+        // } 
         if(number_of_time_order_executed > lot_size_array.length-1){
             number_of_time_order_executed = 0 
         }   
@@ -280,7 +384,7 @@ async function createOrder(bidType,order_price,is_limit_order=false,size) {
             }
         }
         create_order_error = bodyParams
-        console.log('bodyParams', bodyParams)
+        //console.log('bodyParams', bitcoin_current_price, bodyParams)
         const signaturePayload = `POST${timestamp}/v2/orders${JSON.stringify(bodyParams)}`;
         const signature = await generateEncryptSignature(signaturePayload);
 
@@ -328,56 +432,61 @@ function generateGrid(start,end,step){
     return points
 }
  
-function sleep(ms) {
-    return new Promise(resolve => setTimeout(resolve, ms));
-}
-let roundedToHundred = (price) => Math.round(price / 100) * 100
 async function init() {  
     try{
+        let buy_grid = []
+        let sell_grid = []
+
         await cancelAllOpenOrder()
-        const response = await axios.get(`${API_URL}/v2/tickers/BTCUSD`);
-        const current_price = Math.round(response?.data?.result?.close);  
-        bitcoin_product_id = response.data.result.product_id;
-        let round_of_current_price = roundedToHundred(current_price)  
-        upper_price       =  round_of_current_price + 1200
-        lower_price       =  round_of_current_price - 1000
-        grid_spacing      =  (upper_price - lower_price) / numberOfGrids;
-         
-        for (let i = 0; i < numberOfGrids; i++) {
-            const rawBuyPrice = lower_price + i * grid_spacing
-            given_price_range.push({
-                price : rawBuyPrice
-            }); 
-        }
+        await cancelPerticularOpenOrder() 
+
+        const result = await getCurrentPrice() 
+        if (!result?.data?.close) return
+        const spot_price = Math.round(result?.data?.close)
+        bitcoin_product_id = result.data.product_id
         
-        const first_five = given_price_range.slice(0,5)
-        const last_five = given_price_range.slice(-5)
-  
-        first_five.forEach(async (data)=>{
-            order_in_progress = false 
-            await createOrder('sell', data.price, false, 1) 
-            await sleep(500)
-        })
-        last_five.forEach(async (data)=>{
-            order_in_progress = false 
-            await createOrder('buy', data.price, false, 1) 
-            await sleep(500)
-        })
-         
+        border_buy_price = spot_price + buy_sell_point
+        border_buy_profit_price = border_buy_price + buy_sell_profit_point
+        border_price = spot_price
+        border_sell_price = spot_price - buy_sell_point
+        border_sell_profit_price = border_sell_price - buy_sell_profit_point
+    
+        total_error_count = 0   
+        current_running_order = ''
+        
+        console.log('==================BUY PROFIT BORDER==================',border_buy_profit_price)
+        console.log('==================BUY BORDER==================',border_buy_price)
+        console.log('==================CURRENT PRICE==================',spot_price)
+        console.log('==================SELL BORDER==================',border_sell_price)
+        console.log('==================SELL PROFIT BORDER==================',border_sell_profit_price)
+
         updateOrderInfo(JSON.stringify({
             bitcoin_product_id,
-            upper_price,
-            lower_price,
-            grid_spacing,
-        })) 
+            border_buy_profit_price,
+            border_buy_price,
+            border_price:spot_price,
+            border_sell_price,
+            border_sell_profit_price,
+            is_update:false
+        }))
  
-        //await createOrder('sell',current_price-40,false,1)
-
-        // console.log('upper_price__',given_price_range[given_price_range.length-1])
-        // console.log('lower_price__',given_price_range[0])
-        // console.log(given_price_range)
-
-        is_price_out_of_grid = false
+        buy_grid    =   generateGrid(border_buy_price,border_buy_profit_price,30)
+        sell_grid   =   generateGrid(border_sell_profit_price,border_sell_price,30)
+         
+        //console.log('buy_grid__',buy_grid)
+        //console.log('sell_grid__',sell_grid)
+ 
+        await Promise.all(
+            buy_grid.slice(0, 4).map(async (stop_price) => {
+                await createOrder('buy', stop_price, border_price, false, 1) 
+            })
+        )
+        await Promise.all(
+            sell_grid.slice(-4).map(async (stop_price) => {
+                await createOrder('sell', stop_price, border_price, false, 1) 
+            })
+        )
+ 
     }catch(error){
         sendEmail(error.message,`ERROR IN WHEN CALL INIT FUNCTION`)
     }
@@ -468,8 +577,7 @@ async function socketEventInfo(current_price){
         order_data = JSON.parse(order_data) 
     }
     
-    //let current_trend = await findCandleTrend()
-    let current_trend = 'Neutral'
+    let current_trend = await findCandleTrend()
     futureEmitter.emit("future_trade_info", {
         balance : current_balance, 
         bitcoin_product_id : order_data.bitcoin_product_id??0,

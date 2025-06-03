@@ -171,7 +171,7 @@ function wsConnect() {
             } 
             if(message.type == "v2/ticker"){
                 let candle_current_price = message?.close
-                if ( (candle_current_price > given_price_range[given_price_range.length-1]+stoploss_both_side || candle_current_price < given_price_range[0]-stoploss_both_side) && !is_price_out_of_grid ) {
+                if ( (candle_current_price > given_price_range[given_price_range.length-1].price+stoploss_both_side || candle_current_price < given_price_range[0].price-stoploss_both_side) && !is_price_out_of_grid ) {
                     is_price_out_of_grid = true
                     sendEmail('',`PRICE OUT OF THE GRID NOW GRID STOP FOR 10 MINUTE`)
                     await cancelAllOpenOrder()
@@ -334,6 +334,11 @@ async function setRangeLimitOrder() {
         // stop_sell_option    =   update_range_order_wise[6]
         // start_sell_option   =   update_range_order_wise[7]
  
+        console.log('first_five___',first_five)
+        console.log('last_five___',last_five)
+        console.log('given_price_range___',given_price_range)
+        console.log('buy_side_limit___',given_price_range[given_price_range.length-1].price+stoploss_both_side)
+        console.log('buy_sell_limit___',given_price_range[0].price+stoploss_both_side)
         console.log('update_range_order_wise',update_range_order_wise) 
         console.log('create_buy_option___',start_buy_option)
         console.log('stop_buy_option___',stop_buy_option)

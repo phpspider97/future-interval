@@ -171,7 +171,7 @@ function wsConnect() {
             } 
             if(message.type == "v2/ticker"){
                 let candle_current_price = message?.close
-                if ( (candle_current_price > given_price_range[given_price_range.length-1].price+stoploss_both_side || candle_current_price < given_price_range[0].price-stoploss_both_side) && !is_price_out_of_grid ) {
+                if ( given_price_range && given_price_range.length>0 && (candle_current_price > given_price_range[given_price_range.length-1]?.price+stoploss_both_side || candle_current_price < given_price_range[0]?.price-stoploss_both_side) && !is_price_out_of_grid ) {
                     is_price_out_of_grid = true
                     sendEmail('',`PRICE OUT OF THE GRID NOW GRID STOP FOR 10 MINUTE`)
                     await cancelAllOpenOrder()

@@ -38,9 +38,9 @@ function sendEmail(message,subject){
 
 const API_URL       =   process.env.API_URL 
 const SOCKET_URL    =   process.env.API_URL_SOCKET 
-const KEY           =   process.env.OPTION_WEB_KEY
-const SECRET        =   process.env.OPTION_WEB_SECRET 
-const USER_ID       =   process.env.OPTION_WEB_USER_ID
+const KEY           =   process.env.FUTURE_WEB_KEY
+const SECRET        =   process.env.FUTURE_WEB_SECRET 
+const USER_ID       =   process.env.FUTURE_WEB_USER_ID
 
 let lot_size_array                  =    [1, 1, 1] 
 let is_live                         =    false

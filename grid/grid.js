@@ -297,8 +297,8 @@ async function setRangeLimitOrder() {
             }); 
         }
  
-        const first_five = given_price_range.slice(0, 10)
-        const last_five = given_price_range.slice(-10)
+        const first_five = given_price_range.slice(0, 5)
+        const last_five = given_price_range.slice(-5)
 
         // console.log('current_price___',current_price)
         // console.log('first_five___',first_five)

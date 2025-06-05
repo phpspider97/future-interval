@@ -60,9 +60,9 @@ let given_price_range               =   []
 let lower_price                     =   0 
 let upper_price                     =   0 
 let grid_spacing                    =   0
-let numberOfGrids                   =   20
+let numberOfGrids                   =   11
 let profit_margin                   =   200
-let stoploss_both_side              =   30
+let stoploss_both_side              =   50
 let total_error_count               =   0 
 let number_of_time_order_executed   =   0
 let roundedToHundred                =   (price) => Math.round(price / 100) * 100
@@ -127,33 +127,33 @@ function wsConnect() {
                         await createOrder((side == 'buy')?'sell':'buy',update_order_price)
                     }
 
-                    if(start_buy_option == order_at && side == 'sell'){ 
-                        const result = await getCurrentPriceOfBitcoin('put')
-                        if (!result.status) return;
-                        bitcoin_option_product_id = result?.data?.option_data?.product_id
-                        bitcoin_option_product_symbol = result?.data?.option_data?.symbol
-                        await createOptionOrder(result?.data?.option_data?.product_id,result?.data?.option_data?.symbol,'sell')
-                    }
+                    // if(start_buy_option == order_at && side == 'sell'){ 
+                    //     const result = await getCurrentPriceOfBitcoin('put')
+                    //     if (!result.status) return;
+                    //     bitcoin_option_product_id = result?.data?.option_data?.product_id
+                    //     bitcoin_option_product_symbol = result?.data?.option_data?.symbol
+                    //     await createOptionOrder(result?.data?.option_data?.product_id,result?.data?.option_data?.symbol,'sell')
+                    // }
                     
-                    if(start_sell_option == order_at && side == 'buy'){
-                        const result = await getCurrentPriceOfBitcoin('call')
-                        if (!result.status) return;
-                        bitcoin_option_product_id = result?.data?.option_data?.product_id
-                        bitcoin_option_product_symbol = result?.data?.option_data?.symbol
-                        await createOptionOrder(result?.data?.option_data?.product_id,result?.data?.option_data?.symbol,'sell')
-                    }
+                    // if(start_sell_option == order_at && side == 'buy'){
+                    //     const result = await getCurrentPriceOfBitcoin('call')
+                    //     if (!result.status) return;
+                    //     bitcoin_option_product_id = result?.data?.option_data?.product_id
+                    //     bitcoin_option_product_symbol = result?.data?.option_data?.symbol
+                    //     await createOptionOrder(result?.data?.option_data?.product_id,result?.data?.option_data?.symbol,'sell')
+                    // }
  
-                    if(stop_buy_option == order_at && side == 'buy' && bitcoin_option_product_id != 0 && bitcoin_option_product_symbol != ''){
-                        await createOptionOrder(bitcoin_option_product_id,bitcoin_option_product_symbol,'buy')
-                        bitcoin_option_product_id       =   0
-                        bitcoin_option_product_symbol   =   ''
-                    }
+                    // if(stop_buy_option == order_at && side == 'buy' && bitcoin_option_product_id != 0 && bitcoin_option_product_symbol != ''){
+                    //     await createOptionOrder(bitcoin_option_product_id,bitcoin_option_product_symbol,'buy')
+                    //     bitcoin_option_product_id       =   0
+                    //     bitcoin_option_product_symbol   =   ''
+                    // }
 
-                    if(stop_sell_option == order_at && side == 'sell' && bitcoin_option_product_id != 0 && bitcoin_option_product_symbol != ''){
-                        await createOptionOrder(bitcoin_option_product_id,bitcoin_option_product_symbol,'buy')
-                        bitcoin_option_product_id       =   0
-                        bitcoin_option_product_symbol   =   ''
-                    }
+                    // if(stop_sell_option == order_at && side == 'sell' && bitcoin_option_product_id != 0 && bitcoin_option_product_symbol != ''){
+                    //     await createOptionOrder(bitcoin_option_product_id,bitcoin_option_product_symbol,'buy')
+                    //     bitcoin_option_product_id       =   0
+                    //     bitcoin_option_product_symbol   =   ''
+                    // }
 
                      // store_data_for_testing = {
                     //     order_at,
@@ -282,7 +282,7 @@ async function setRangeLimitOrder() {
         const current_price = Math.round(response?.data?.result?.close);  
         bitcoin_product_id = response.data.result.product_id;
         let round_of_current_price = roundedToHundred(current_price)  
-        upper_price       =  round_of_current_price + 1000
+        upper_price       =  round_of_current_price + 1200
         lower_price       =  round_of_current_price - 1000
         grid_spacing      =  (upper_price - lower_price) / numberOfGrids;
          

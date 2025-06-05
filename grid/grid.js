@@ -60,9 +60,9 @@ let given_price_range               =   []
 let lower_price                     =   0 
 let upper_price                     =   0 
 let grid_spacing                    =   0
-let numberOfGrids                   =   11
+let numberOfGrids                   =   20
 let profit_margin                   =   200
-let stoploss_both_side              =   100
+let stoploss_both_side              =   30
 let total_error_count               =   0 
 let number_of_time_order_executed   =   0
 let roundedToHundred                =   (price) => Math.round(price / 100) * 100
@@ -142,17 +142,6 @@ function wsConnect() {
                         bitcoin_option_product_symbol = result?.data?.option_data?.symbol
                         await createOptionOrder(result?.data?.option_data?.product_id,result?.data?.option_data?.symbol,'sell')
                     }
-                    // store_data_for_testing = {
-                    //     order_at,
-                    //     side,
-                    //     bitcoin_option_product_id,
-                    //     bitcoin_option_product_symbol,
-                    //     start_buy_option,
-                    //     stop_buy_option,
-                    //     stop_sell_option,
-                    //     start_sell_option
-                    // }
-                    // console.table(store_data_for_testing)
  
                     if(stop_buy_option == order_at && side == 'buy' && bitcoin_option_product_id != 0 && bitcoin_option_product_symbol != ''){
                         await createOptionOrder(bitcoin_option_product_id,bitcoin_option_product_symbol,'buy')
@@ -165,6 +154,18 @@ function wsConnect() {
                         bitcoin_option_product_id       =   0
                         bitcoin_option_product_symbol   =   ''
                     }
+
+                     // store_data_for_testing = {
+                    //     order_at,
+                    //     side,
+                    //     bitcoin_option_product_id,
+                    //     bitcoin_option_product_symbol,
+                    //     start_buy_option,
+                    //     stop_buy_option,
+                    //     stop_sell_option,
+                    //     start_sell_option
+                    // }
+                    // console.table(store_data_for_testing)
                     
                     //sendEmail('',`ONE ${side.toUpperCase()} SIDE STOP ORDER TRIGGERED AT ${order_at}`)
                 }
@@ -281,7 +282,7 @@ async function setRangeLimitOrder() {
         const current_price = Math.round(response?.data?.result?.close);  
         bitcoin_product_id = response.data.result.product_id;
         let round_of_current_price = roundedToHundred(current_price)  
-        upper_price       =  round_of_current_price + 1200
+        upper_price       =  round_of_current_price + 1000
         lower_price       =  round_of_current_price - 1000
         grid_spacing      =  (upper_price - lower_price) / numberOfGrids;
          
@@ -296,8 +297,8 @@ async function setRangeLimitOrder() {
             }); 
         }
  
-        const first_five = given_price_range.slice(0, 5)
-        const last_five = given_price_range.slice(-5)
+        const first_five = given_price_range.slice(0, 10)
+        const last_five = given_price_range.slice(-10)
 
         // console.log('current_price___',current_price)
         // console.log('first_five___',first_five)
@@ -313,7 +314,15 @@ async function setRangeLimitOrder() {
             await createOrder('sell',data.price)
             await sleep(500)
         })
-         
+
+        // const put_result = await getCurrentPriceOfBitcoin('put',1200)
+        // if(put_result.data.option_data != undefined){
+        //     await createOptionOrder(put_result?.data?.option_data?.product_id,put_result?.data?.option_data?.symbol)
+        // } 
+        // const call_result = await getCurrentPriceOfBitcoin('call',1000)
+        // if(call_result.data.option_data != undefined){
+        //     await createOptionOrder(call_result?.data?.option_data?.product_id,call_result?.data?.option_data?.symbol)
+        // }  
         updateOrderInfo(JSON.stringify({
             bitcoin_product_id,
             upper_price,
@@ -326,8 +335,8 @@ async function setRangeLimitOrder() {
         const update_range_order_wise = given_price_range.slice().sort((a, b) => b.price - a.price).map(item => item.price) 
         start_buy_option    =   update_range_order_wise[1]
         stop_buy_option     =   update_range_order_wise[2]
-        stop_sell_option    =   update_range_order_wise[8]
-        start_sell_option   =   update_range_order_wise[9]
+        stop_sell_option    =   update_range_order_wise[update_range_order_wise.length-3]
+        start_sell_option   =   update_range_order_wise[update_range_order_wise.length-2]
 
         // start_buy_option    =   update_range_order_wise[3]
         // stop_buy_option     =   update_range_order_wise[4]
@@ -404,17 +413,17 @@ async function createOrder(bid_type,order_price){
 }
 
 async function createOptionOrder(product_id,bitcoin_option_symbol,side='sell') { 
-    if (order_in_progress){ 
-        return true
-    }
-    order_in_progress = true
+    // if (order_in_progress){ 
+    //     return true
+    // }
+    // order_in_progress = true
      
     try { 
         const timestamp = Math.floor(Date.now() / 1000);
         const bodyParams = {
             product_id: product_id??0, 
             product_symbol: bitcoin_option_symbol??'', 
-            size: 10,
+            size: 15,
             side: side, 
             order_type: "market_order"
         } 
@@ -464,25 +473,24 @@ async function createOptionOrder(product_id,bitcoin_option_symbol,side='sell') {
 }
  
 function getAdjustedDate() { 
-    const now = new Date();
-    const istOffset = 5.5 * 60;
-    const istTime = new Date(now.getTime() + (istOffset - now.getTimezoneOffset()) * 60000);
-   
-    if (istTime.getHours() > 17 || (istTime.getHours() === 17 && istTime.getMinutes() >= 10)) {
-      istTime.setDate(istTime.getDate() + 1);
+    const now = new Date()
+    const currentHour = now.getHours()
+ 
+    const targetDate = new Date(now)
+    if (currentHour >= 18) {
+        targetDate.setDate(targetDate.getDate() + 1);
     }
-  
-    const day = String(istTime.getDate()).padStart(2, '0');
-    const month = String(istTime.getMonth() + 1).padStart(2, '0');
-    const year = istTime.getFullYear();
+ 
+    const day = String(targetDate.getDate()).padStart(2, '0');
+    const month = String(targetDate.getMonth() + 1).padStart(2, '0');
+    const year = targetDate.getFullYear();
    
     return `${day}-${month}-${year}`;
 }
 
-async function getCurrentPriceOfBitcoin(data_type) {
+async function getCurrentPriceOfBitcoin(data_type,price_addition=0) {
     try { 
         const expiry_date = getAdjustedDate()  
-   
         const response = await axios.get(`${API_URL}/v2/tickers/?underlying_asset_symbols=BTC&contract_types=call_options,put_options&states=live&expiry_date=${expiry_date}`)
         const allProducts = response.data.result
         
@@ -492,15 +500,16 @@ async function getCurrentPriceOfBitcoin(data_type) {
         //console.log('allProducts___',allProducts)
         console.log('spot_price___',spot_price)
         console.log('data_type___',data_type)
+        
         let option_data = []
         if(data_type == 'call'){ 
             option_data = allProducts.filter(product =>
-                product.contract_type == 'call_options' && product.strike_price == spot_price+600
-            );
+                product.contract_type == 'call_options' && product.strike_price == spot_price+200
+            ); 
         }else if(data_type == 'put'){ 
             option_data = allProducts.filter(product =>
-                product.contract_type == 'put_options' && product.strike_price == spot_price-600
-            );
+                product.contract_type == 'put_options' && product.strike_price == spot_price-200
+            ); 
         } 
         const bitcoin_option_data = {
             option_data : option_data[0]

@@ -2,11 +2,11 @@ const express = require("express");
 const http = require("http");
 const { Server } = require("socket.io");
 const path = require("path"); 
-const { futureEmitter } = require("./future/future"); 
-const { optionEmitter } = require("./option/option"); 
+// const { futureEmitter } = require("./future/future"); 
+// const { optionEmitter } = require("./option/option"); 
 const { gridEmitter } = require("./grid/grid"); 
 const { crossEmitter } = require("./cross/cross"); 
-const { strangleOptionEmitter } = require("./strangle/strangle"); 
+// const { strangleOptionEmitter } = require("./strangle/strangle"); 
 // const { superTrendEmitter } = require("./super-trend/super-trend"); 
  
 const app = express();
@@ -14,21 +14,21 @@ const server = http.createServer(app);
 const io = new Server(server); 
  
 //==============================FUTURE==================================
-futureEmitter.on("future_trade_info", (data) => { 
-    io.emit("future_trade_info", data)
-})  
-app.get('/', (req, res) => {  
-    res.sendFile(path.join(__dirname, 'public', 'future.html'));
-}) 
+// futureEmitter.on("future_trade_info", (data) => { 
+//     io.emit("future_trade_info", data)
+// })  
+// app.get('/', (req, res) => {  
+//     res.sendFile(path.join(__dirname, 'public', 'future.html'));
+// }) 
 //==============================FUTURE==================================
 
 //==============================OPTION==================================
-optionEmitter.on("option_trade_info", (data) => { 
-    io.emit("option_trade_info", data)
-})  
-app.get('/option', (req, res) => {  
-    res.sendFile(path.join(__dirname, 'public', 'option.html'));
-}) 
+// optionEmitter.on("option_trade_info", (data) => { 
+//     io.emit("option_trade_info", data)
+// })  
+// app.get('/option', (req, res) => {  
+//     res.sendFile(path.join(__dirname, 'public', 'option.html'));
+// }) 
 //==============================OPTION==================================
 
 //==============================GRID==================================
@@ -61,28 +61,28 @@ app.get('/cross', (req, res) => {
 //==============================SUPER TREND==================================
 
 //==============================STRANGLE==================================
-strangleOptionEmitter.on("strangle_trade_info", (data) => {  
-    //console.log('data__',data)
-    io.emit("strangle_trade_info", data)
-})  
-app.get('/strangle', (req, res) => {  
-    res.sendFile(path.join(__dirname, 'public', 'strangle.html'));
-}) 
+// strangleOptionEmitter.on("strangle_trade_info", (data) => {  
+//     //console.log('data__',data)
+//     io.emit("strangle_trade_info", data)
+// })  
+// app.get('/strangle', (req, res) => {  
+//     res.sendFile(path.join(__dirname, 'public', 'strangle.html'));
+// }) 
 //==============================STRANGLE==================================
 
 io.on("connection", (socket) => {
-    socket.on("future_start", () => { 
-        futureEmitter.emit("future_start")
-    })
-    socket.on("future_stop", () => { 
-        futureEmitter.emit("future_stop")
-    })
-    socket.on("option_start", () => { 
-        optionEmitter.emit("option_start")
-    })
-    socket.on("option_stop", () => { 
-        optionEmitter.emit("option_stop")
-    })
+    // socket.on("future_start", () => { 
+    //     futureEmitter.emit("future_start")
+    // })
+    // socket.on("future_stop", () => { 
+    //     futureEmitter.emit("future_stop")
+    // })
+    // socket.on("option_start", () => { 
+    //     optionEmitter.emit("option_start")
+    // })
+    // socket.on("option_stop", () => { 
+    //     optionEmitter.emit("option_stop")
+    // })
     socket.on("grid_start", () => { 
         gridEmitter.emit("grid_start")
     })
@@ -95,12 +95,12 @@ io.on("connection", (socket) => {
     socket.on("cross_stop", () => { 
         crossEmitter.emit("cross_stop")
     })
-    socket.on("strangle_start", () => { 
-        strangleOptionEmitter.emit("strangle_start")
-    })
-    socket.on("strangle_stop", () => { 
-        strangleOptionEmitter.emit("strangle_stop")
-    })
+    // socket.on("strangle_start", () => { 
+    //     strangleOptionEmitter.emit("strangle_start")
+    // })
+    // socket.on("strangle_stop", () => { 
+    //     strangleOptionEmitter.emit("strangle_stop")
+    // })
     // socket.on("super_trend_start", () => { 
     //     superTrendEmitter.emit("super_trend_start")
     // })

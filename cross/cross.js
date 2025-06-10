@@ -2,7 +2,7 @@ const axios = require('axios')
 require('dotenv').config()
 const crypto = require('crypto');
 const SYMBOL = 'BTCUSD'
-const INTERVAL = '1hr'
+const INTERVAL = '15min'
 const fs = require('fs')
 const nodemailer = require('nodemailer') 
 const { EMA } = require('technicalindicators')
@@ -124,13 +124,13 @@ async function checkCrossOver(){
             order_type = 'Buy'
             cross_over_type = 'Bullish' 
             //await createOrder('buy')
-            sendEmail('BULLISH CROSS OVER DETECT','')
+            sendEmail('9 & 16 BULLISH CROSS OVER DETECT','')
         } else if (previousEMA9 > previousEMA21 && currentEMA9 < currentEMA21) { 
             console.log('Bearish')
             order_type = 'Sell'
             cross_over_type = 'Bearish'
             //await createOrder('sell')
-            sendEmail('BEARISH CROSS OVER DETECT','')
+            sendEmail('29545459 BEARISH CROSS OVER DETECT','')
         } else { 
             console.log('Neutral')
             order_type = 'Neutral' 

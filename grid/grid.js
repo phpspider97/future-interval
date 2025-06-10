@@ -60,8 +60,8 @@ let given_price_range               =   []
 let lower_price                     =   0 
 let upper_price                     =   0 
 let grid_spacing                    =   0
-let numberOfGrids                   =   11
-let profit_margin                   =   200
+let numberOfGrids                   =   24
+let profit_margin                   =   25
 let stoploss_both_side              =   50
 let total_error_count               =   0 
 let number_of_time_order_executed   =   0
@@ -102,8 +102,8 @@ function wsConnect() {
         const message = JSON.parse(data) 
         if (message.type === 'success' && message.message === 'Authenticated') {
             subscribe(ws, 'orders', ['all'])
-            subscribe(ws, 'v2/ticker', ['BTCUSD'])
-            subscribe(ws, 'l2_orderbook', ['BTCUSD']) 
+            subscribe(ws, 'v2/ticker', ['ETHUSD'])
+            subscribe(ws, 'l2_orderbook', ['ETHUSD']) 
         } else {
             if(message.type == 'error'){
                 sendEmail(message.message,`IP ADDRESS ERROR`)
@@ -175,7 +175,7 @@ function wsConnect() {
                 if ( given_price_range && given_price_range.length>0 && (candle_current_price > given_price_range[given_price_range.length-1]?.price+stoploss_both_side || candle_current_price < given_price_range[0]?.price-stoploss_both_side) && !is_price_out_of_grid ) {
                     is_price_out_of_grid = true
                     sendEmail('',`PRICE OUT OF THE GRID NOW GRID STOP FOR 10 MINUTE`)
-                    await cancelAllOpenOrder()
+                    //await cancelAllOpenOrder()
                     setTimeout(async () => {
                         sendEmail('',`GRID CREATE AGAIN AFTER 10 MINUTE`)
                         await setRangeLimitOrder()
@@ -278,12 +278,12 @@ function sleep(ms) {
 async function setRangeLimitOrder() {
     try {
         await cancelAllOpenOrder()
-        const response = await axios.get(`${API_URL}/v2/tickers/BTCUSD`);
+        const response = await axios.get(`${API_URL}/v2/tickers/ETHUSD`);
         const current_price = Math.round(response?.data?.result?.close);  
         bitcoin_product_id = response.data.result.product_id;
         let round_of_current_price = roundedToHundred(current_price)  
-        upper_price       =  round_of_current_price + 1200
-        lower_price       =  round_of_current_price - 1000
+        upper_price       =  round_of_current_price + 300
+        lower_price       =  round_of_current_price - 300
         grid_spacing      =  (upper_price - lower_price) / numberOfGrids;
          
         for (let i = 0; i < numberOfGrids; i++) {
@@ -297,8 +297,8 @@ async function setRangeLimitOrder() {
             }); 
         }
   
-        const first_five = given_price_range.slice(0, 5)
-        const last_five = given_price_range.slice(-5)
+        const first_five = given_price_range.slice(0, 12)
+        const last_five = given_price_range.slice(-11)
 
         // console.log('current_price___',current_price)
         // console.log('first_five___',first_five)
@@ -376,7 +376,7 @@ async function createOrder(bid_type,order_price){
         const timestamp = Math.floor(Date.now() / 1000);
         const bodyParams = {
             product_id : bitcoin_product_id,
-            product_symbol : "BTCUSD",
+            product_symbol : "ETHUSD",
             size : 1, 
             side : bid_type,   
             order_type : "limit_order",
@@ -491,12 +491,12 @@ function getAdjustedDate() {
 async function getCurrentPriceOfBitcoin(data_type,price_addition=0) {
     try { 
         const expiry_date = getAdjustedDate()  
-        const response = await axios.get(`${API_URL}/v2/tickers/?underlying_asset_symbols=BTC&contract_types=call_options,put_options&states=live&expiry_date=${expiry_date}`)
+        const response = await axios.get(`${API_URL}/v2/tickers/?underlying_asset_symbols=ETH&contract_types=call_options,put_options&states=live&expiry_date=${expiry_date}`)
         const allProducts = response.data.result
         
         const spot_price = Math.round(allProducts[0].spot_price / 200) * 200
          
-        console.log('url',`${API_URL}/v2/tickers/?underlying_asset_symbols=BTC&contract_types=call_options,put_options&states=live&expiry_date=${expiry_date}`)
+        console.log('url',`${API_URL}/v2/tickers/?underlying_asset_symbols=ETH&contract_types=call_options,put_options&states=live&expiry_date=${expiry_date}`)
         //console.log('allProducts___',allProducts)
         console.log('spot_price___',spot_price)
         console.log('data_type___',data_type)
@@ -590,7 +590,7 @@ async function socketEventInfo(current_price){
     let current_trend = "Neutral"
     gridEmitter.emit("grid_trade_info", {
         balance : current_balance,
-        product_symbol : "BTCUSD",
+        product_symbol : "ETHUSD",
         bitcoin_product_id : order_data.bitcoin_product_id??0,
         current_price : current_price??0,
         upper_price,

@@ -6,6 +6,7 @@ const { futureEmitter } = require("./future/future");
 const { optionEmitter } = require("./option/option"); 
 const { gridEmitter } = require("./grid/grid"); 
 const { crossEmitter } = require("./cross/cross"); 
+const { strangleOptionEmitter } = require("./strangle/strangle"); 
 // const { superTrendEmitter } = require("./super-trend/super-trend"); 
  
 const app = express();
@@ -59,6 +60,16 @@ app.get('/cross', (req, res) => {
 // }) 
 //==============================SUPER TREND==================================
 
+//==============================STRANGLE==================================
+strangleOptionEmitter.on("strangle_trade_info", (data) => {  
+    //console.log('data__',data)
+    io.emit("strangle_trade_info", data)
+})  
+app.get('/strangle', (req, res) => {  
+    res.sendFile(path.join(__dirname, 'public', 'strangle.html'));
+}) 
+//==============================STRANGLE==================================
+
 io.on("connection", (socket) => {
     socket.on("future_start", () => { 
         futureEmitter.emit("future_start")
@@ -83,6 +94,12 @@ io.on("connection", (socket) => {
     })
     socket.on("cross_stop", () => { 
         crossEmitter.emit("cross_stop")
+    })
+    socket.on("strangle_start", () => { 
+        strangleOptionEmitter.emit("strangle_start")
+    })
+    socket.on("strangle_stop", () => { 
+        strangleOptionEmitter.emit("strangle_stop")
     })
     // socket.on("super_trend_start", () => { 
     //     superTrendEmitter.emit("super_trend_start")

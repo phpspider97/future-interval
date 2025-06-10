@@ -2,7 +2,7 @@ const axios = require('axios')
 require('dotenv').config()
 const crypto = require('crypto');
 const SYMBOL = 'BTCUSD'
-const INTERVAL = '5m'
+const INTERVAL = '1hr'
 const fs = require('fs')
 const nodemailer = require('nodemailer') 
 const { EMA } = require('technicalindicators')
@@ -104,7 +104,7 @@ async function checkCrossOver(){
     }
  
     const ema9 = EMA.calculate({ period: 9, values: closes });
-    const ema21 = EMA.calculate({ period: 21, values: closes });
+    const ema21 = EMA.calculate({ period: 16, values: closes });
  
     if (ema9.length >= 2 && ema21.length >= 2) {
         const currentEMA9 = ema9[ema9.length - 1];
@@ -119,18 +119,20 @@ async function checkCrossOver(){
         //     await cancelAllOpenOrder()
         // }
         //console.log('order_type___',order_type)
-        if (previousEMA9 < previousEMA21 && currentEMA9 > currentEMA21) {
-            //console.log('Bullish')
+        if (previousEMA9 < previousEMA21 && currentEMA9 > currentEMA21) { 
+            console.log('Bullish')
             order_type = 'Buy'
             cross_over_type = 'Bullish' 
-            await createOrder('buy')
-        } else if (previousEMA9 > previousEMA21 && currentEMA9 < currentEMA21) {
-            //console.log('Bearish');
+            //await createOrder('buy')
+            sendEmail('BULLISH CROSS OVER DETECT','')
+        } else if (previousEMA9 > previousEMA21 && currentEMA9 < currentEMA21) { 
+            console.log('Bearish')
             order_type = 'Sell'
             cross_over_type = 'Bearish'
-            await createOrder('sell')
+            //await createOrder('sell')
+            sendEmail('BEARISH CROSS OVER DETECT','')
         } else { 
-            //console.log('Neutral');
+            console.log('Neutral')
             order_type = 'Neutral' 
             cross_over_type = 'Neutral'
         }

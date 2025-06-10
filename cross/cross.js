@@ -2,11 +2,11 @@ const axios = require('axios')
 require('dotenv').config()
 const crypto = require('crypto');
 const SYMBOL = 'BTCUSD'
-const INTERVAL = '15min'
+const INTERVAL = '15m'
 const fs = require('fs')
 const nodemailer = require('nodemailer') 
 const { EMA } = require('technicalindicators')
-const { classifyLastCandle } = require('./trend.js')
+// const { classifyLastCandle } = require('./trend.js')
 
 const EventEmitter = require('events')
 const crossEmitter = new EventEmitter()
@@ -71,8 +71,8 @@ let is_live                         =   false
 async function fetchCandles() {
     const end_time_stamp = Math.floor(Date.now() / 1000)
     const start_time_stamp = end_time_stamp - (20 * 60 * 60)
-
-    try {
+    
+    try {   
         const response = await axios.get(`${API_URL}/v2/history/candles`, {
             params : { 
                 symbol : SYMBOL, 
@@ -81,6 +81,7 @@ async function fetchCandles() {
                 end : end_time_stamp 
             }
         }); 
+        
         const candles = response.data.result 
         const closePrices = candles.map(c => parseFloat(c.close));
         previous_candle_data = closePrices.reverse()
@@ -93,60 +94,57 @@ async function fetchCandles() {
 }
 
 async function checkCrossOver(){
-    const result = await getCurrentPrice() 
-    bitcoin_current_price = result?.data?.close
-    bitcoin_product_id = result.data.product_id 
+    try{
+        const result = await getCurrentPrice() 
+        bitcoin_current_price = result?.data?.close
+        bitcoin_product_id = result.data.product_id 
 
-    const closes = await fetchCandles() 
-    if (closes.length < 21) {
-      console.log('⚠️ Not enough data to calculate EMAs');
-      return;
-    }
- 
-    const ema9 = EMA.calculate({ period: 9, values: closes });
-    const ema21 = EMA.calculate({ period: 16, values: closes });
- 
-    if (ema9.length >= 2 && ema21.length >= 2) {
-        const currentEMA9 = ema9[ema9.length - 1];
-        const previousEMA9 = ema9[ema9.length - 2];
-        const currentEMA21 = ema21[ema21.length - 1];
-        const previousEMA21 = ema21[ema21.length - 2];
-
-        // if(current_running_order == 'buy' && bitcoin_current_price < currentEMA21){
-        //     await cancelAllOpenOrder()
-        // }
-        // if(current_running_order == 'sell' && bitcoin_current_price > currentEMA21){
-        //     await cancelAllOpenOrder()
-        // }
-        //console.log('order_type___',order_type)
-        if (previousEMA9 < previousEMA21 && currentEMA9 > currentEMA21) { 
-            console.log('Bullish')
-            order_type = 'Buy'
-            cross_over_type = 'Bullish' 
-            //await createOrder('buy')
-            sendEmail('9 & 16 BULLISH CROSS OVER DETECT','')
-        } else if (previousEMA9 > previousEMA21 && currentEMA9 < currentEMA21) { 
-            console.log('Bearish')
-            order_type = 'Sell'
-            cross_over_type = 'Bearish'
-            //await createOrder('sell')
-            sendEmail('29545459 BEARISH CROSS OVER DETECT','')
-        } else { 
-            console.log('Neutral')
-            order_type = 'Neutral' 
-            cross_over_type = 'Neutral'
+        const closes = await fetchCandles() 
+        if (closes.length < 21) {
+        console.log('⚠️ Not enough data to calculate EMAs');
+        return;
         }
-
-        updateOrderInfo(JSON.stringify({
-            bitcoin_product_id,  
-            current_price : bitcoin_current_price??0,
-            order_type,
-            currentEMA9,
-            currentEMA21,
-            cross_over_type
-        }))
+    
+        const ema9 = EMA.calculate({ period: 9, values: closes });
+        const ema21 = EMA.calculate({ period: 16, values: closes });
+    
+        if (ema9.length >= 2 && ema21.length >= 2) {
+            const currentEMA9 = ema9[ema9.length - 1];
+            const previousEMA9 = ema9[ema9.length - 2];
+            const currentEMA21 = ema21[ema21.length - 1];
+            const previousEMA21 = ema21[ema21.length - 2];
+    
+            if (previousEMA9 < previousEMA21 && currentEMA9 > currentEMA21) { 
+                //console.log('Bullish')
+                order_type = 'Buy'
+                cross_over_type = 'Bullish' 
+                //await createOrder('buy')
+                sendEmail('9 & 16 BULLISH CROSS OVER DETECT','')
+            } else if (previousEMA9 > previousEMA21 && currentEMA9 < currentEMA21) { 
+                //console.log('Bearish')
+                order_type = 'Sell'
+                cross_over_type = 'Bearish'
+                //await createOrder('sell')
+                sendEmail('9 & 16 BEARISH CROSS OVER DETECT','')
+            } else { 
+                //console.log('Neutral')
+                order_type = 'Neutral' 
+                cross_over_type = 'Neutral'
+            }
+            
+            updateOrderInfo(JSON.stringify({
+                bitcoin_product_id,  
+                current_price : bitcoin_current_price??0,
+                order_type,
+                currentEMA9,
+                currentEMA21,
+                cross_over_type
+            }))
+        }
+        triggerOrder(bitcoin_current_price)
+    }catch(error){
+        console.log('checkCrossOver error : ', error.message)
     }
-    triggerOrder(bitcoin_current_price)
 }
 
 async function getCurrentPrice() {
@@ -280,7 +278,7 @@ async function getBalance() {
 }
  
 async function init() { 
-    await cancelAllOpenOrder()
+    //await cancelAllOpenOrder()
     is_live = (fs.statSync('./cross/orderInfo.json').size != 0)?true:false 
     //console.log('is_live___',is_live)
     if(is_live){
@@ -293,7 +291,7 @@ async function init() {
         cross_over_type = order_data.cross_over_type??''
         cross_over_interval = setInterval( async () => {
             await checkCrossOver()
-        }, 2000)
+        }, 20000)
     }
 }
 init() 
@@ -302,7 +300,7 @@ init()
 //   setTimeout(scheduleCrossCheck, 3000)
 // }
 
-async function updateOrderInfo(content){
+async function updateOrderInfo(content){  
   fs.writeFile('./cross/orderInfo.json', content, (err) => {
       if (err) {
           console.error('Error writing file:', err);
@@ -313,15 +311,19 @@ async function updateOrderInfo(content){
 }
 async function socketEventInfo(current_price){ 
     let order_data = {}
-    let current_balance = await getBalance() 
+    //let current_balance = await getBalance() 
+    let current_balance = 100000 
     is_live = (fs.statSync('./cross/orderInfo.json').size != 0)?true:false
     if(is_live){
-        order_data = fs.readFileSync('./cross/orderInfo.json', 'utf8')
-        order_data = JSON.parse(order_data) 
+        order_data = fs.readFileSync('./cross/orderInfo.json', 'utf8') 
+        //console.log('order_data___',order_data)
+        if(order_data != undefined && order_data != ''){
+            order_data = JSON.parse(order_data) 
+        }
     }
     
-    let current_trend = await classifyLastCandle()
-
+    let current_trend = 'Neutral'
+    
     crossEmitter.emit("cross_trade_info", {
         balance : current_balance,
         product_symbol : "BTCUSD",
@@ -358,7 +360,8 @@ crossEmitter.on("cross_start", async () => {
 crossEmitter.on("cross_stop", async () => { 
     is_live = false 
     clearInterval(cross_over_interval)
-    await cancelAllOpenOrder() 
+    //await cancelAllOpenOrder() 
+    //console.log('stop___')
     fs.writeFileSync('./cross/orderInfo.json', '', 'utf8')
 })
 

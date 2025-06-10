@@ -113,6 +113,7 @@ function wsConnect() {
                 return true
             } 
             if(total_error_count > 3) {  
+                console.log('total_error_count___',total_error_count)
                 is_live = false
                 fs.writeFileSync('./grid/orderInfo.json', '', 'utf8')
                 ws.close(1000, 'Too many errors');
@@ -124,6 +125,7 @@ function wsConnect() {
                     
                     const update_order_price = (side == 'buy')?order_at+profit_margin:order_at-profit_margin 
                     if(!is_price_out_of_grid){ 
+                        console.log('update_order_price___',order_at,side,update_order_price)
                         await createOrder((side == 'buy')?'sell':'buy',update_order_price)
                     }
 
@@ -173,13 +175,14 @@ function wsConnect() {
             if(message.type == "v2/ticker"){
                 let candle_current_price = message?.close
                 if ( given_price_range && given_price_range.length>0 && (candle_current_price > given_price_range[given_price_range.length-1]?.price+stoploss_both_side || candle_current_price < given_price_range[0]?.price-stoploss_both_side) && !is_price_out_of_grid ) {
-                    is_price_out_of_grid = true
+                    //is_price_out_of_grid = true
                     sendEmail('',`PRICE OUT OF THE GRID NOW GRID STOP FOR 10 MINUTE`)
                     //await cancelAllOpenOrder()
-                    setTimeout(async () => {
-                        sendEmail('',`GRID CREATE AGAIN AFTER 10 MINUTE`)
-                        await setRangeLimitOrder()
-                    }, 600000) // 10 min
+                    // setTimeout(async () => {
+                    //     sendEmail('',`GRID CREATE AGAIN AFTER 10 MINUTE`)
+                    //     await setRangeLimitOrder()
+                    // }, 600000) 
+                    // 10 min
                 }
                 triggerOrder(candle_current_price)
             } 
@@ -377,7 +380,7 @@ async function createOrder(bid_type,order_price){
         const bodyParams = {
             product_id : bitcoin_product_id,
             product_symbol : "ETHUSD",
-            size : 1, 
+            size : 2, 
             side : bid_type,   
             order_type : "limit_order",
             limit_price : order_price
@@ -395,7 +398,7 @@ async function createOrder(bid_type,order_price){
         }
 
         const response = await axios.post(`${API_URL}/v2/orders`, bodyParams, { headers })
-        //console.log('create order : ',response.data)
+        console.log('create order : ',response.data)
         if (response.data.success) { 
             number_of_time_order_executed++  
             return { data: response.data, status: true }
@@ -574,7 +577,7 @@ async function updateOrderInfo(content){
         if (error) {
             sendEmail(JSON.stringify(error),`ERROR IN WHEN UPDATE ORDER FILE`)
         } else {
-            console.log('File created and text written successfully.')
+           //console.log('File created and text written successfully.')
         }
     });
 }

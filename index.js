@@ -88,7 +88,7 @@ io.on("connection", (socket) => {
     })
     socket.on("grid_stop", () => { 
         gridEmitter.emit("grid_stop")
-    })
+    }) 
     socket.on("cross_start", () => { 
         crossEmitter.emit("cross_start")
     })

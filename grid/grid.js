@@ -61,7 +61,7 @@ let lower_price                     =   0
 let upper_price                     =   0 
 let grid_spacing                    =   0
 let numberOfGrids                   =   11
-let profit_margin                   =   25
+let profit_margin                   =   200
 let stoploss_both_side              =   50
 let total_error_count               =   0 
 let number_of_time_order_executed   =   0
@@ -125,8 +125,7 @@ function wsConnect() {
                         const order_at = parseInt(message.limit_price)
                         
                         const update_order_price = (side == 'buy')?order_at+profit_margin:order_at-profit_margin 
-                        if(!is_price_out_of_grid){ 
-                            console.log('update_order_price___',order_at,side,update_order_price)
+                        if(!is_price_out_of_grid){  
                             await createOrder((side == 'buy')?'sell':'buy',update_order_price)
                         }
 

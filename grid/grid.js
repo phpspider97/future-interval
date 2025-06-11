@@ -350,17 +350,17 @@ async function setRangeLimitOrder() {
         // stop_sell_option    =   update_range_order_wise[6]
         // start_sell_option   =   update_range_order_wise[7]
  
-        console.log('first_five___',first_five)
-        console.log('last_five___',last_five)
-        console.log('given_price_range___',given_price_range)
-        console.log('buy_side_limit___',given_price_range[given_price_range.length-1].price+stoploss_both_side)
-        console.log('buy_sell_limit___',given_price_range[0].price+stoploss_both_side)
-        console.log('update_range_order_wise',update_range_order_wise) 
-        console.log('create_buy_option___',start_buy_option)
-        console.log('stop_buy_option___',stop_buy_option)
-        console.log('')
-        console.log('create_sell_option___',start_sell_option)
-        console.log('stop_sell_option___',stop_sell_option)
+        // console.log('first_five___',first_five)
+        // console.log('last_five___',last_five)
+        // console.log('given_price_range___',given_price_range)
+        // console.log('buy_side_limit___',given_price_range[given_price_range.length-1].price+stoploss_both_side)
+        // console.log('buy_sell_limit___',given_price_range[0].price+stoploss_both_side)
+        // console.log('update_range_order_wise',update_range_order_wise) 
+        // console.log('create_buy_option___',start_buy_option)
+        // console.log('stop_buy_option___',stop_buy_option)
+        // console.log('')
+        // console.log('create_sell_option___',start_sell_option)
+        // console.log('stop_sell_option___',stop_sell_option)
 
     } catch (error) {
         sendEmail(error.message,`ERROR IN WHEN CANCEL ALL ORDER`)
@@ -379,7 +379,7 @@ async function createOrder(bid_type,order_price){
         return true
     }
     order_in_progress = true
-    try { 
+    try {  
         const timestamp = Math.floor(Date.now() / 1000);
         const bodyParams = {
             product_id : bitcoin_product_id,
@@ -399,8 +399,8 @@ async function createOrder(bid_type,order_price){
             "timestamp": timestamp,
             "Content-Type": "application/json",
             "Accept": "application/json",
-        }
-
+        } 
+         
         const response = await axios.post(`${API_URL}/v2/orders`, bodyParams, { headers })
         console.log('create order : ',response.data)
         if (response.data.success) { 
@@ -409,7 +409,7 @@ async function createOrder(bid_type,order_price){
         }
         return { message: "Order failed", status: false }
     } catch (error) {
-        console.log('error : ',error.message)
+        console.log('error : ',error.response.data)
         sendEmail(error.message +' '+JSON.stringify(body_param_for_testing),`ERROR IN WHEN CREATING ORDER`) 
         total_error_count++ 
         order_in_progress = false;  

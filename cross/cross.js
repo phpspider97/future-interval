@@ -105,8 +105,8 @@ async function checkCrossOver(){
         return;
         }
     
-        const ema9 = EMA.calculate({ period: 9, values: closes });
-        const ema21 = EMA.calculate({ period: 16, values: closes });
+        const ema9 = EMA.calculate({ period: 9, values: closes })
+        const ema21 = EMA.calculate({ period: 16, values: closes })
     
         if (ema9.length >= 2 && ema21.length >= 2) {
             const currentEMA9 = ema9[ema9.length - 1];
@@ -114,18 +114,18 @@ async function checkCrossOver(){
             const currentEMA21 = ema21[ema21.length - 1];
             const previousEMA21 = ema21[ema21.length - 2];
     
-            if (previousEMA9 < previousEMA21 && currentEMA9 > currentEMA21) { 
-                //console.log('Bullish')
+            if (previousEMA9 < previousEMA21 && currentEMA9 > currentEMA21 && current_running_order != 'buy') {
                 order_type = 'Buy'
                 cross_over_type = 'Bullish' 
                 //await createOrder('buy')
                 sendEmail('9 & 16 BULLISH CROSS OVER DETECT','')
-            } else if (previousEMA9 > previousEMA21 && currentEMA9 < currentEMA21) { 
-                //console.log('Bearish')
+                current_running_order = 'buy'
+            } else if (previousEMA9 > previousEMA21 && currentEMA9 < currentEMA21 && current_running_order != 'sell') {
                 order_type = 'Sell'
                 cross_over_type = 'Bearish'
                 //await createOrder('sell')
                 sendEmail('9 & 16 BEARISH CROSS OVER DETECT','')
+                current_running_order = 'sell'
             } else { 
                 //console.log('Neutral')
                 order_type = 'Neutral' 

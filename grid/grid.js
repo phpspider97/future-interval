@@ -99,94 +99,98 @@ function wsConnect() {
         ws.send(JSON.stringify(payload));
     }
     async function onMessage(data) {
-        const message = JSON.parse(data) 
-        if (message.type === 'success' && message.message === 'Authenticated') {
-            subscribe(ws, 'orders', ['all'])
-            subscribe(ws, 'v2/ticker', ['ETHUSD'])
-            subscribe(ws, 'l2_orderbook', ['ETHUSD']) 
-        } else {
-            if(message.type == 'error'){
-                sendEmail(message.message,`IP ADDRESS ERROR`)
-                console.log("GRID : " + message.message)
-            }
-            if(!is_live){ 
-                return true
-            } 
-            if(total_error_count > 3) {  
-                console.log('total_error_count___',total_error_count)
-                is_live = false
-                fs.writeFileSync('./grid/orderInfo.json', '', 'utf8')
-                ws.close(1000, 'Too many errors');
-            } 
-            if(message.type == "orders"){  
-                if(message.state == 'closed' && message.meta_data.pnl != undefined){  
-                    const side = message.side
-                    const order_at = parseInt(message.limit_price)
-                    
-                    const update_order_price = (side == 'buy')?order_at+profit_margin:order_at-profit_margin 
-                    if(!is_price_out_of_grid){ 
-                        console.log('update_order_price___',order_at,side,update_order_price)
-                        await createOrder((side == 'buy')?'sell':'buy',update_order_price)
+        try{
+            const message = JSON.parse(data) 
+            if (message.type === 'success' && message.message === 'Authenticated') {
+                subscribe(ws, 'orders', ['all'])
+                subscribe(ws, 'v2/ticker', ['ETHUSD'])
+                subscribe(ws, 'l2_orderbook', ['ETHUSD']) 
+            } else {
+                if(message.type == 'error'){
+                    sendEmail(message.message,`IP ADDRESS ERROR`)
+                    console.log("GRID : " + message.message)
+                }
+                if(!is_live){ 
+                    return true
+                } 
+                if(total_error_count > 3) {  
+                    console.log('total_error_count___',total_error_count)
+                    is_live = false
+                    fs.writeFileSync('./grid/orderInfo.json', '', 'utf8')
+                    ws.close(1000, 'Too many errors');
+                } 
+                if(message.type == "orders"){  
+                    if(message.state == 'closed' && message.meta_data.pnl != undefined){  
+                        const side = message.side
+                        const order_at = parseInt(message.limit_price)
+                        
+                        const update_order_price = (side == 'buy')?order_at+profit_margin:order_at-profit_margin 
+                        if(!is_price_out_of_grid){ 
+                            console.log('update_order_price___',order_at,side,update_order_price)
+                            await createOrder((side == 'buy')?'sell':'buy',update_order_price)
+                        }
+
+                        // if(start_buy_option == order_at && side == 'sell'){ 
+                        //     const result = await getCurrentPriceOfBitcoin('put')
+                        //     if (!result.status) return;
+                        //     bitcoin_option_product_id = result?.data?.option_data?.product_id
+                        //     bitcoin_option_product_symbol = result?.data?.option_data?.symbol
+                        //     await createOptionOrder(result?.data?.option_data?.product_id,result?.data?.option_data?.symbol,'sell')
+                        // }
+                        
+                        // if(start_sell_option == order_at && side == 'buy'){
+                        //     const result = await getCurrentPriceOfBitcoin('call')
+                        //     if (!result.status) return;
+                        //     bitcoin_option_product_id = result?.data?.option_data?.product_id
+                        //     bitcoin_option_product_symbol = result?.data?.option_data?.symbol
+                        //     await createOptionOrder(result?.data?.option_data?.product_id,result?.data?.option_data?.symbol,'sell')
+                        // }
+    
+                        // if(stop_buy_option == order_at && side == 'buy' && bitcoin_option_product_id != 0 && bitcoin_option_product_symbol != ''){
+                        //     await createOptionOrder(bitcoin_option_product_id,bitcoin_option_product_symbol,'buy')
+                        //     bitcoin_option_product_id       =   0
+                        //     bitcoin_option_product_symbol   =   ''
+                        // }
+
+                        // if(stop_sell_option == order_at && side == 'sell' && bitcoin_option_product_id != 0 && bitcoin_option_product_symbol != ''){
+                        //     await createOptionOrder(bitcoin_option_product_id,bitcoin_option_product_symbol,'buy')
+                        //     bitcoin_option_product_id       =   0
+                        //     bitcoin_option_product_symbol   =   ''
+                        // }
+
+                        // store_data_for_testing = {
+                        //     order_at,
+                        //     side,
+                        //     bitcoin_option_product_id,
+                        //     bitcoin_option_product_symbol,
+                        //     start_buy_option,
+                        //     stop_buy_option,
+                        //     stop_sell_option,
+                        //     start_sell_option
+                        // }
+                        // console.table(store_data_for_testing)
+                        
+                        //sendEmail('',`ONE ${side.toUpperCase()} SIDE STOP ORDER TRIGGERED AT ${order_at}`)
                     }
-
-                    // if(start_buy_option == order_at && side == 'sell'){ 
-                    //     const result = await getCurrentPriceOfBitcoin('put')
-                    //     if (!result.status) return;
-                    //     bitcoin_option_product_id = result?.data?.option_data?.product_id
-                    //     bitcoin_option_product_symbol = result?.data?.option_data?.symbol
-                    //     await createOptionOrder(result?.data?.option_data?.product_id,result?.data?.option_data?.symbol,'sell')
-                    // }
-                    
-                    // if(start_sell_option == order_at && side == 'buy'){
-                    //     const result = await getCurrentPriceOfBitcoin('call')
-                    //     if (!result.status) return;
-                    //     bitcoin_option_product_id = result?.data?.option_data?.product_id
-                    //     bitcoin_option_product_symbol = result?.data?.option_data?.symbol
-                    //     await createOptionOrder(result?.data?.option_data?.product_id,result?.data?.option_data?.symbol,'sell')
-                    // }
- 
-                    // if(stop_buy_option == order_at && side == 'buy' && bitcoin_option_product_id != 0 && bitcoin_option_product_symbol != ''){
-                    //     await createOptionOrder(bitcoin_option_product_id,bitcoin_option_product_symbol,'buy')
-                    //     bitcoin_option_product_id       =   0
-                    //     bitcoin_option_product_symbol   =   ''
-                    // }
-
-                    // if(stop_sell_option == order_at && side == 'sell' && bitcoin_option_product_id != 0 && bitcoin_option_product_symbol != ''){
-                    //     await createOptionOrder(bitcoin_option_product_id,bitcoin_option_product_symbol,'buy')
-                    //     bitcoin_option_product_id       =   0
-                    //     bitcoin_option_product_symbol   =   ''
-                    // }
-
-                     // store_data_for_testing = {
-                    //     order_at,
-                    //     side,
-                    //     bitcoin_option_product_id,
-                    //     bitcoin_option_product_symbol,
-                    //     start_buy_option,
-                    //     stop_buy_option,
-                    //     stop_sell_option,
-                    //     start_sell_option
-                    // }
-                    // console.table(store_data_for_testing)
-                    
-                    //sendEmail('',`ONE ${side.toUpperCase()} SIDE STOP ORDER TRIGGERED AT ${order_at}`)
-                }
+                } 
+                if(message.type == "v2/ticker"){
+                    let candle_current_price = message?.close
+                    if ( given_price_range && given_price_range.length>0 && (candle_current_price > given_price_range[given_price_range.length-1]?.price+stoploss_both_side || candle_current_price < given_price_range[0]?.price-stoploss_both_side) && !is_price_out_of_grid ) {
+                        //is_price_out_of_grid = true
+                        sendEmail('',`PRICE OUT OF THE GRID NOW GRID STOP FOR 10 MINUTE`)
+                        //await cancelAllOpenOrder()
+                        // setTimeout(async () => {
+                        //     sendEmail('',`GRID CREATE AGAIN AFTER 10 MINUTE`)
+                        //     await setRangeLimitOrder()
+                        // }, 600000) 
+                        // 10 min
+                    }
+                    triggerOrder(candle_current_price)
+                } 
             } 
-            if(message.type == "v2/ticker"){
-                let candle_current_price = message?.close
-                if ( given_price_range && given_price_range.length>0 && (candle_current_price > given_price_range[given_price_range.length-1]?.price+stoploss_both_side || candle_current_price < given_price_range[0]?.price-stoploss_both_side) && !is_price_out_of_grid ) {
-                    //is_price_out_of_grid = true
-                    sendEmail('',`PRICE OUT OF THE GRID NOW GRID STOP FOR 10 MINUTE`)
-                    //await cancelAllOpenOrder()
-                    // setTimeout(async () => {
-                    //     sendEmail('',`GRID CREATE AGAIN AFTER 10 MINUTE`)
-                    //     await setRangeLimitOrder()
-                    // }, 600000) 
-                    // 10 min
-                }
-                triggerOrder(candle_current_price)
-            } 
-        } 
+        }catch(error){
+            console.log('socket error : ', error.message)
+        }
     } 
     async function onError(error) {
         await cancelAllOpenOrder()

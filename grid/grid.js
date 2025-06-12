@@ -403,7 +403,7 @@ async function createOrder(bid_type,order_price){
         } 
          
         const response = await axios.post(`${API_URL}/v2/orders`, bodyParams, { headers })
-        console.log('create order : ',response.data)
+        //console.log('create order : ',response.data)
         if (response.data.success) { 
             number_of_time_order_executed++  
             return { data: response.data, status: true }

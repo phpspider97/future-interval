@@ -20,7 +20,6 @@ const lastSentTimestamps = {}
 const THROTTLE_INTERVAL_MS = 60 * 1000
 function sendEmail(message,subject){
     console.log("STRANGLE EMAIL MESSAGE :", message)
-    return true
     if(!is_live){
         return true
     }

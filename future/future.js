@@ -18,7 +18,6 @@ let transporter = nodemailer.createTransport({
 })  
 function sendEmail(message,subject){
    // console.log('message : ',message)
-    return true
     if(!is_live){
         return true
     }

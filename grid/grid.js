@@ -183,9 +183,12 @@ function wsConnect() {
                         //     await setRangeLimitOrder()
                         // }, 600000) 
                         // 10 min
-                    }else{
+                    }
+                    
+                    if ( given_price_range && given_price_range.length>0 && (candle_current_price < given_price_range[given_price_range.length-1]?.price+stoploss_both_side || candle_current_price > given_price_range[0]?.price-stoploss_both_side) && is_price_out_of_grid ) {
                         is_price_out_of_grid = false
                     }
+
                     triggerOrder(candle_current_price)
                 } 
             } 
@@ -208,7 +211,8 @@ function wsConnect() {
         }
         console.log(`Socket closed with code: ${code}, reason: ${reason}`)
         if(code == 1000){
-            sendEmail(reason.toString(),`SOCKET CLOSED DUE TO TOO MANY ERROR`)
+            sendEmail(reason.toString(),`SOCKET CLOSED DUE TO TOO MANY ERRORR`)
+            console.log('cancelAllOpenOrder___')
             await cancelAllOpenOrder()
             setTimeout(() => {
                 total_error_count = 0 
@@ -588,7 +592,8 @@ async function updateOrderInfo(content){
 }
 async function socketEventInfo(current_price){
     let order_data = {}
-    let current_balance = await getBalance() 
+    //let current_balance = await getBalance() 
+    let current_balance = 100000
     is_live = (fs.statSync('./grid/orderInfo.json').size != 0)?true:false
     if(is_live){
         order_data = fs.readFileSync('./grid/orderInfo.json', 'utf8')

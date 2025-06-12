@@ -62,7 +62,7 @@ let upper_price                     =   0
 let grid_spacing                    =   0
 let numberOfGrids                   =   11
 let profit_margin                   =   200
-let stoploss_both_side              =   50
+let stoploss_both_side              =   0
 let total_error_count               =   0 
 let number_of_time_order_executed   =   0
 let roundedToHundred                =   (price) => Math.round(price / 100) * 100
@@ -305,7 +305,7 @@ async function setRangeLimitOrder() {
             }); 
         }
   
-        const first_five = given_price_range.slice(0, 6)
+        const first_five = given_price_range.slice(0, 5)
         const last_five = given_price_range.slice(-5)
 
         // console.log('current_price___',current_price)

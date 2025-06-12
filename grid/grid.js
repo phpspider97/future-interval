@@ -385,7 +385,7 @@ async function createOrder(bid_type,order_price){
         const bodyParams = {
             product_id : bitcoin_product_id,
             product_symbol : "BTCUSD",
-            size : 2, 
+            size : 1, 
             side : bid_type,   
             order_type : "limit_order",
             limit_price : order_price
@@ -435,7 +435,7 @@ async function createOptionOrder(product_id,bitcoin_option_symbol,side='sell') {
             side: side, 
             order_type: "market_order"
         } 
-        console.log('bodyParams___',bodyParams)
+        //console.log('bodyParams___',bodyParams)
 
         body_param_for_testing = bodyParams
         const signaturePayload = `POST${timestamp}/v2/orders${JSON.stringify(bodyParams)}`;

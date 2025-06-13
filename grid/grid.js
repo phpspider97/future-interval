@@ -113,7 +113,7 @@ function wsConnect() {
                 if(!is_live){ 
                     return true
                 } 
-                if(total_error_count > 3) {  
+                if(total_error_count > 30) {  
                     console.log('total_error_count___',total_error_count)
                     is_live = false
                     fs.writeFileSync('./grid/orderInfo.json', '', 'utf8')
@@ -211,8 +211,9 @@ function wsConnect() {
         }
         console.log(`Socket closed with code: ${code}, reason: ${reason}`)
         if(code == 1000){
+            console.log('SOCKET CLOSED DUE TO TOO MANY ERRORR total_error_count',total_error_count)
             sendEmail(reason.toString(),`SOCKET CLOSED DUE TO TOO MANY ERRORR`) 
-            await cancelAllOpenOrder()
+            //await cancelAllOpenOrder()
             setTimeout(() => {
                 total_error_count = 0 
                 sendEmail('',`SOCKET RE-CONNECT AGAIN AFTER 1 MINUTE CLOSED DUE TO TOO MANY ERROR`)

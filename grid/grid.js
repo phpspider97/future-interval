@@ -60,7 +60,7 @@ let given_price_range               =   []
 let lower_price                     =   0 
 let upper_price                     =   0 
 let grid_spacing                    =   0
-let numberOfGrids                   =   21
+let numberOfGrids                   =   41
 let profit_margin                   =   100
 let stoploss_both_side              =   0
 let total_error_count               =   0 
@@ -211,8 +211,7 @@ function wsConnect() {
         }
         console.log(`Socket closed with code: ${code}, reason: ${reason}`)
         if(code == 1000){
-            sendEmail(reason.toString(),`SOCKET CLOSED DUE TO TOO MANY ERRORR`)
-            console.log('cancelAllOpenOrder___')
+            sendEmail(reason.toString(),`SOCKET CLOSED DUE TO TOO MANY ERRORR`) 
             await cancelAllOpenOrder()
             setTimeout(() => {
                 total_error_count = 0 
@@ -290,13 +289,13 @@ function sleep(ms) {
 async function setRangeLimitOrder() {
     try {
         await cancelAllOpenOrder()
-        const response = await axios.get(`${API_URL}/v2/tickers/BTCUSD`);
-        const current_price = Math.round(response?.data?.result?.close);  
+        const response = await axios.get(`${API_URL}/v2/tickers/BTCUSD`)
+        const current_price = Math.round(response?.data?.result?.close)  
         bitcoin_product_id = response.data.result.product_id;
         let round_of_current_price = roundedToHundred(current_price)  
-        upper_price       =  round_of_current_price + 1100
-        lower_price       =  round_of_current_price - 1000
-        grid_spacing      =  (upper_price - lower_price) / numberOfGrids;
+        upper_price       =  round_of_current_price + 2100
+        lower_price       =  round_of_current_price - 2000
+        grid_spacing      =  (upper_price - lower_price) / numberOfGrids
          
         for (let i = 0; i < numberOfGrids; i++) {
             const rawBuyPrice = lower_price + i * grid_spacing
@@ -309,8 +308,8 @@ async function setRangeLimitOrder() {
             }); 
         }
   
-        const first_five = given_price_range.slice(0, 10)
-        const last_five = given_price_range.slice(-10)
+        const first_five = given_price_range.slice(0, 20)
+        const last_five = given_price_range.slice(-20)
 
         // console.log('current_price___',current_price)
         // console.log('first_five___',first_five)
@@ -377,6 +376,7 @@ async function generateEncryptSignature(signaturePayload) {
     return crypto.createHmac("sha256", SECRET).update(signaturePayload).digest("hex");
 }
 async function createOrder(bid_type,order_price){
+    console.log('create_order_total_error_count___',total_error_count)
     if(total_error_count>3){
         return true
     } 
@@ -414,7 +414,7 @@ async function createOrder(bid_type,order_price){
         }
         return { message: "Order failed", status: false }
     } catch (error) {
-        console.log('error : ',error.response.data)
+        console.log('ERROR IN WHEN CREATING ORDER : ',error.message)
         sendEmail(error.message +' '+JSON.stringify(body_param_for_testing),`ERROR IN WHEN CREATING ORDER`) 
         total_error_count++ 
         order_in_progress = false;  

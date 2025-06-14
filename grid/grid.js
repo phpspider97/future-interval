@@ -60,7 +60,7 @@ let given_price_range               =   []
 let lower_price                     =   0 
 let upper_price                     =   0 
 let grid_spacing                    =   0
-let numberOfGrids                   =   41
+let numberOfGrids                   =   22
 let profit_margin                   =   100
 let stoploss_both_side              =   0
 let total_error_count               =   0 
@@ -213,7 +213,7 @@ function wsConnect() {
         if(code == 1000){
             console.log('SOCKET CLOSED DUE TO TOO MANY ERRORR total_error_count',total_error_count)
             sendEmail(reason.toString(),`SOCKET CLOSED DUE TO TOO MANY ERRORR`) 
-            //await cancelAllOpenOrder()
+            await cancelAllOpenOrder()
             setTimeout(() => {
                 total_error_count = 0 
                 sendEmail('',`SOCKET RE-CONNECT AGAIN AFTER 1 MINUTE CLOSED DUE TO TOO MANY ERROR`)
@@ -294,8 +294,8 @@ async function setRangeLimitOrder() {
         const current_price = Math.round(response?.data?.result?.close)  
         bitcoin_product_id = response.data.result.product_id;
         let round_of_current_price = roundedToHundred(current_price)  
-        upper_price       =  round_of_current_price + 2100
-        lower_price       =  round_of_current_price - 2000
+        upper_price       =  round_of_current_price + 2200
+        lower_price       =  round_of_current_price - 2200
         grid_spacing      =  (upper_price - lower_price) / numberOfGrids
          
         for (let i = 0; i < numberOfGrids; i++) {
@@ -309,8 +309,8 @@ async function setRangeLimitOrder() {
             }); 
         }
   
-        const first_five = given_price_range.slice(0, 20)
-        const last_five = given_price_range.slice(-20)
+        const first_five = given_price_range.slice(1, 11)
+        const last_five = given_price_range.slice(-10)
 
         // console.log('current_price___',current_price)
         // console.log('first_five___',first_five)

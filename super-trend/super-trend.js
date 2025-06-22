@@ -2,11 +2,11 @@ const axios = require('axios')
 require('dotenv').config()
 const crypto = require('crypto');
 const SYMBOL = 'BTCUSD'
-const INTERVAL = '5m'
+const INTERVAL = '1h' 
 const fs = require('fs')
 const nodemailer = require('nodemailer') 
 const { ATR } = require('technicalindicators')
-const { classifyLastCandle } = require('./trend.js')
+//const { classifyLastCandle } = require('./trend.js')
 
 const EventEmitter = require('events')
 const superTrendEmitter = new EventEmitter()
@@ -31,10 +31,10 @@ let transporter = nodemailer.createTransport({
     pass: process.env.USER_PASSWORD
   },
 }); 
-
+ 
 async function fetchCandles() {
     const end_time_stamp = Math.floor(Date.now() / 1000)
-    const start_time_stamp = end_time_stamp - (2 * 60 * 60)
+    const start_time_stamp = end_time_stamp - (40 * 60 * 60)
 
     try {
         const response = await axios.get(`${api_url}/v2/history/candles`, {
@@ -47,9 +47,8 @@ async function fetchCandles() {
         }); 
         const candles = response.data.result  
         return candles.reverse()
-
     } catch (err) {
-        console.error('❌ Error fetching candles:', err.message);
+        console.error('❌ Error fetching candles:', JSON.stringify(err.response.data), err.message);
         return [];
     }
 }
@@ -88,7 +87,7 @@ function calculateSupertrend(candles, period, multiplier) {
     //console.log(result)
     return result;
 }
-function getSignal(supertrend) {
+function getSignal(supertrend) { 
     const latest = supertrend[supertrend.length - 1];
     return latest.trend === 'up' ? 'buy' : 'sell';
 }
@@ -98,16 +97,17 @@ async function checkSuperTrend(){
         bitcoin_current_price = result?.data?.close
         bitcoin_product_id = result.data.product_id 
         const candles = await fetchCandles() 
-        // if (candles.length < 21) {
-        //     console.log('⚠️ Not enough data to calculate EMAs');
-        //     return;
-        // } 
+        if (candles.length < 21) {
+            console.log('⚠️ Not enough data to calculate EMAs');
+            return;
+        } 
         const supertrend = calculateSupertrend(candles, 10, 3);
         const signal = getSignal(supertrend);
         //console.log(`[${new Date().toISOString()}] Signal: ${signal}`)
-        current_order_status = signal
 
         if(current_order_status != signal){
+            current_order_status = signal
+            sendEmail(`SUPER TREND CHANGED : ${signal.toUpperCase()}`,'')
             await createOrder(signal)
         }
             
@@ -185,6 +185,7 @@ async function createOrder(bidType) {
     if(!is_live){
       return true
     } 
+    await cancelAllOpenOrder()
     const timestamp = Math.floor(Date.now() / 1000);
     const bodyParams = {
       product_id: bitcoin_product_id,
@@ -225,7 +226,7 @@ async function createOrder(bidType) {
           </tr>
       </table>
       `
-      sendEmail(message_template,`CREATE ORDER : 1`)
+      //sendEmail(message_template,`CREATE ORDER : 1`)
 
       number_of_time_order_executed++
       return { data: response.data, status: true };
@@ -299,7 +300,8 @@ async function socketEventInfo(current_price){
       order_data = JSON.parse(order_data) 
   }
   
-  let current_trend = await classifyLastCandle()
+  //let current_trend = await classifyLastCandle()
+  let current_trend ='Neutral'
 
   superTrendEmitter.emit("super_trend_trade_info", {
       balance : current_balance,

@@ -61,7 +61,7 @@ let lower_price                     =   0
 let upper_price                     =   0 
 let grid_spacing                    =   0
 let numberOfGrids                   =   22
-let profit_margin                   =   100
+let profit_margin                   =   200
 let stoploss_both_side              =   0
 let total_error_count               =   0 
 let number_of_time_order_executed   =   0
@@ -122,11 +122,11 @@ function wsConnect() {
                     if(message.state == 'closed' && message.meta_data.pnl != undefined){  
                         const side = message.side
                         const order_at = parseInt(message.limit_price)
-                        
-                        const update_order_price = (side == 'buy')?order_at+profit_margin:order_at-profit_margin 
-                        if(!is_price_out_of_grid){  
+                        const update_order_price = (side == 'buy')?order_at+profit_margin:order_at-profit_margin
+
+                        if(!is_price_out_of_grid && order_at <= upper_price && order_at >= lower_price){
                             await createOrder((side == 'buy')?'sell':'buy',update_order_price)
-                        }
+                        } 
 
                         // if(start_buy_option == order_at && side == 'sell'){ 
                         //     const result = await getCurrentPriceOfBitcoin('put')
@@ -175,7 +175,7 @@ function wsConnect() {
                     let candle_current_price = message?.close
                     if ( given_price_range && given_price_range.length>0 && (candle_current_price > given_price_range[given_price_range.length-1]?.price+stoploss_both_side || candle_current_price < given_price_range[0]?.price-stoploss_both_side) && !is_price_out_of_grid ) {
                         is_price_out_of_grid = true
-                        sendEmail('',`PRICE OUT OF THE GRID NOW GRID STOP FOR 10 MINUTE`)
+                        //sendEmail('',`PRICE OUT OF THE GRID NOW GRID STOP FOR 10 MINUTE`)
                         //await cancelAllOpenOrder()
                         // setTimeout(async () => {
                         //     sendEmail('',`GRID CREATE AGAIN AFTER 10 MINUTE`)

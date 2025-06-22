@@ -441,7 +441,7 @@ async function createOrder(bid_type,order_price){
         } 
         return { message: "Order failed", status: false }
     } catch (error) {
-        //console.log('total_error_count____',error.response.data)
+        console.log('total_error_count____',error.response.data)
         sendEmail(error.message +' '+JSON.stringify(body_param_for_testing),`ERROR IN WHEN CREATING ORDER : ${JSON.stringify(body_param_for_testing)}`) 
         total_error_count++ 
         order_in_progress = false;  

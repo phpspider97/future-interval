@@ -293,7 +293,8 @@ async function updateOrderInfo(content){
 }
 async function socketEventInfo(current_price){ 
   let order_data = {}
-  let current_balance = await getBalance() 
+  //let current_balance = await getBalance() 
+  let current_balance = 100000
   is_live = (fs.statSync('./super-trend/orderInfo.json').size != 0)?true:false
   if(is_live){
       order_data = fs.readFileSync('./super-trend/orderInfo.json', 'utf8')

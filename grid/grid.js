@@ -60,8 +60,8 @@ let given_price_range               =   []
 let lower_price                     =   0 
 let upper_price                     =   0 
 let grid_spacing                    =   0
-let numberOfGrids                   =   22
-let profit_margin                   =   200
+let numberOfGrids                   =   22 
+let profit_margin                   =   300
 let stoploss_both_side              =   0
 let total_error_count               =   0 
 let number_of_time_order_executed   =   0
@@ -75,7 +75,7 @@ let stop_buy_option                 =   0
 let start_sell_option               =   0
 let stop_sell_option                =   0
 let store_data_for_testing          =   {}
-
+ 
 function wsConnect() { 
     const WEBSOCKET_URL = SOCKET_URL
     const API_KEY = KEY
@@ -294,8 +294,8 @@ async function setRangeLimitOrder() {
         const current_price = Math.round(response?.data?.result?.close)  
         bitcoin_product_id = response.data.result.product_id;
         let round_of_current_price = roundedToHundred(current_price)  
-        upper_price       =  round_of_current_price + 2200
-        lower_price       =  round_of_current_price - 2200
+        upper_price       =  round_of_current_price + 3300
+        lower_price       =  round_of_current_price - 3300
         grid_spacing      =  (upper_price - lower_price) / numberOfGrids
          
         for (let i = 0; i < numberOfGrids; i++) {
@@ -306,7 +306,7 @@ async function setRangeLimitOrder() {
                     buy  : false,
                     sell : false
                 }
-            }); 
+            });  
         }
   
         const first_five = given_price_range.slice(1, 11)

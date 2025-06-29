@@ -223,7 +223,7 @@ async function checkSuperTrend() {
     }
     const supertrend = calculateSupertrend(candles, 10, 3);
     const signal = getSignal(supertrend);
-    console.log('Signal:', signal);
+    //console.log('Signal:', signal);
 
     if (current_order_status !== signal && signal !== 'hold') {
       current_order_status = signal;

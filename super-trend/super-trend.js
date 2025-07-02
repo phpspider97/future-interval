@@ -1,19 +1,19 @@
-// Updated Supertrend Trading Bot Code
 const axios = require('axios');
 require('dotenv').config();
 const crypto = require('crypto');
 const fs = require('fs');
 const nodemailer = require('nodemailer');
-const { ATR } = require('technicalindicators');
+const { ATR, EMA, RSI } = require('technicalindicators');
 const EventEmitter = require('events');
-
+ 
 const SYMBOL = 'BTCUSD';
-const INTERVAL = '1h';
+const INTERVAL = '15m';
 const superTrendEmitter = new EventEmitter();
 
 const key = process.env.SUPER_TREND_WEB_KEY;
 const secret = process.env.SUPER_TREND_WEB_SECRET;
 const api_url = process.env.API_URL;
+const ORDER_SIZE = parseFloat(process.env.ORDER_SIZE || 1);
 
 let bitcoin_current_price = 0;
 let bitcoin_product_id = null;
@@ -36,21 +36,14 @@ let transporter = nodemailer.createTransport({
 
 async function fetchCandles() {
   const end_time_stamp = Math.floor(Date.now() / 1000);
-  const start_time_stamp = end_time_stamp - (40 * 60 * 60);
+  const start_time_stamp = end_time_stamp - (10 * 60 * 60);
   try {
     const response = await axios.get(`${api_url}/v2/history/candles`, {
-      params: {
-        symbol: SYMBOL,
-        resolution: INTERVAL,
-        start: start_time_stamp,
-        end: end_time_stamp
-      }
+      params: { symbol: SYMBOL, resolution: INTERVAL, start: start_time_stamp, end: end_time_stamp }
     });
-    const candles = response.data.result;
-    //console.log(candles.reverse())
-    return candles.reverse();
+    return response.data.result.reverse();
   } catch (err) {
-    console.error('❌ Error fetching candles:', JSON.stringify(err.response?.data), err.message);
+    console.error('❌ Error fetching candles:', err.message);
     return [];
   }
 }
@@ -60,64 +53,55 @@ function calculateSupertrend(candles, period, multiplier) {
   const low = candles.map(c => parseFloat(c.low));
   const close = candles.map(c => parseFloat(c.close));
   const atr = ATR.calculate({ high, low, close, period });
+
   const result = [];
-
-  let finalUpperBand = 0;
-  let finalLowerBand = 0;
-  let trend = 'down';
-
-  for (let i = 0; i < atr.length; i++) {
+  for (let i = 0; i < atr.length && (i + period) < candles.length; i++) {
     const idx = i + period;
-    if (idx >= candles.length) break;
-
     const hl2 = (high[idx] + low[idx]) / 2;
     const upperBand = hl2 + multiplier * atr[i];
     const lowerBand = hl2 - multiplier * atr[i];
     const closePrice = close[idx];
 
-    if (i > 0) {
-      finalUpperBand = (upperBand < result[i - 1].finalUpperBand || closePrice > result[i - 1].finalUpperBand)
-        ? upperBand : result[i - 1].finalUpperBand;
-      finalLowerBand = (lowerBand > result[i - 1].finalLowerBand || closePrice < result[i - 1].finalLowerBand)
-        ? lowerBand : result[i - 1].finalLowerBand;
-      if (result[i - 1].trend === 'down' && closePrice > finalUpperBand) {
-        trend = 'up';
-      } else if (result[i - 1].trend === 'up' && closePrice < finalLowerBand) {
-        trend = 'down';
-      } else {
-        trend = result[i - 1].trend;
-      }
-    } else {
-      finalUpperBand = upperBand;
-      finalLowerBand = lowerBand;
+    let trend = 'down';
+    if (i > 0 && result[i - 1]) {
+      const prev = result[i - 1];
+      trend = (closePrice > prev.upperBand) ? 'up' :
+              (closePrice < prev.lowerBand) ? 'down' :
+              prev.trend;
     }
+
     result.push({
       time: candles[idx].time,
       upperBand,
       lowerBand,
-      finalUpperBand,
-      finalLowerBand,
       trend
     });
   }
   return result;
 }
 
+function calculateIndicators(candles) {
+  const close = candles.map(c => parseFloat(c.close));
+  const ema9 = EMA.calculate({ period: 9, values: close });
+  const ema21 = EMA.calculate({ period: 21, values: close });
+  const rsi14 = RSI.calculate({ period: 14, values: close });
+
+  return {
+    ema9: ema9.at(-1),
+    ema21: ema21.at(-1),
+    rsi: rsi14.at(-1)
+  };
+}
+
 function getSignal(supertrend) {
-  const len = supertrend.length;
-  const recentTrends = supertrend.slice(-3).map(s => s.trend);
-  const upCount = recentTrends.filter(t => t === 'up').length;
-  const downCount = recentTrends.filter(t => t === 'down').length;
-  if (upCount >= 2) return 'buy';
-  if (downCount >= 2) return 'sell';
-  return 'hold';
+  return supertrend.at(-1)?.trend === 'up' ? 'BUY' : 'SELL';
 }
 
 async function getCurrentPriceOfBitcoin() {
   try {
     const response = await axios.get(`${api_url}/v2/tickers?contract_type=perpetual_futures`);
-    const btc_ticker_data = response.data.result.find(t => t.symbol === SYMBOL);
-    return { data: btc_ticker_data, status: true };
+    const data = response.data.result.find(t => t.symbol === SYMBOL);
+    return { data, status: true };
   } catch (error) {
     return { message: error.message, status: false };
   }
@@ -137,7 +121,6 @@ async function cancelAllOpenOrder() {
     };
     const signaturePayload = `POST${timestamp}/v2/positions/close_all${JSON.stringify(bodyParams)}`;
     const signature = await generateEncryptSignature(signaturePayload);
-
     const headers = {
       "api-key": key,
       "signature": signature,
@@ -145,7 +128,6 @@ async function cancelAllOpenOrder() {
       "Content-Type": "application/json",
       "Accept": "application/json",
     };
-
     const response = await axios.post(`${api_url}/v2/positions/close_all`, bodyParams, { headers });
     return { data: response.data, status: true };
   } catch (error) {
@@ -155,35 +137,34 @@ async function cancelAllOpenOrder() {
 }
 
 function sendEmail(message, subject) {
-  let mailOptions = {
+  const options = {
     from: process.env.USER_EMAIL,
     to: 'allinonetrade0009@gmail.com',
     subject: 'SUPER TREND BOT : ' + subject,
-    html: message
+    html: `<pre>${message}</pre>`
   };
-  transporter.sendMail(mailOptions, (error, info) => {
-    if (error) return console.log('Email error:', error);
-    console.log('Email sent:', info.response);
+  transporter.sendMail(options, (err, info) => {
+    if (err) return console.log('Email error:', err);
+    console.log('📧 Email sent:', info.response);
   });
 }
 
 async function createOrder(bidType) {
-  try {
-    if (!is_live || orderInProgress) return true;
-    orderInProgress = true;
+  if (!is_live || orderInProgress) return true;
+  orderInProgress = true;
 
+  try {
     await cancelAllOpenOrder();
     const timestamp = Math.floor(Date.now() / 1000);
     const bodyParams = {
       product_id: bitcoin_product_id,
       product_symbol: SYMBOL,
-      size: 1,
+      size: ORDER_SIZE,
       side: bidType,
       order_type: "market_order",
     };
     const signaturePayload = `POST${timestamp}/v2/orders${JSON.stringify(bodyParams)}`;
     const signature = await generateEncryptSignature(signaturePayload);
-
     const headers = {
       "api-key": key,
       "signature": signature,
@@ -192,11 +173,12 @@ async function createOrder(bidType) {
       "Accept": "application/json",
     };
 
-    const response = await axios.post(`${api_url}/v2/orders`, bodyParams, { headers });
-    if (response.data.success) {
+    const res = await axios.post(`${api_url}/v2/orders`, bodyParams, { headers });
+    if (res.data.success) {
       number_of_time_order_executed++;
-      return { data: response.data, status: true };
+      return { data: res.data, status: true };
     }
+
     return { message: "Order failed", status: false };
   } catch (error) {
     sendEmail(JSON.stringify(error.response?.data) + ' ==> ' + error.message, `ERROR CREATE ORDER`);
@@ -213,22 +195,30 @@ async function updateOrderInfo(content) {
 
 async function checkSuperTrend() {
   try {
-    const result = await getCurrentPriceOfBitcoin();
-    bitcoin_current_price = result?.data?.close;
-    bitcoin_product_id = result?.data?.product_id;
-    const candles = await fetchCandles();
-    if (candles.length < 21) {
-      console.log('⚠️ Not enough data to calculate Supertrend');
-      return;
-    }
-    const supertrend = calculateSupertrend(candles, 10, 3);
-    const signal = getSignal(supertrend);
-    //console.log('Signal:', signal);
+    const res = await getCurrentPriceOfBitcoin();
+    bitcoin_current_price = res?.data?.close;
+    bitcoin_product_id = res?.data?.product_id;
 
-    if (current_order_status !== signal && signal !== 'hold') {
+    const candles = await fetchCandles();
+    if (candles.length < 21) return console.log('⚠️ Not enough data');
+
+    const supertrend = calculateSupertrend(candles, 10, 3);
+    let signal = getSignal(supertrend);
+    const { ema9, ema21, rsi } = calculateIndicators(candles);
+
+    if ([ema9, ema21, rsi].some(x => x == null || isNaN(x))) return;
+
+    const emaSignal = ema9 > ema21 ? 'BUY' : 'SELL';
+    const rsiSignal = rsi > 50 ? 'BUY' : 'SELL';
+    let super_trend_signal = signal
+    signal = emaSignal
+    //console.log('SUPER TREND:',super_trend_signal, '| EMA:', emaSignal, '| RSI:', rsiSignal);
+ 
+    if (current_order_status !== signal && signal === emaSignal && signal === rsiSignal) {
       current_order_status = signal;
-      sendEmail(`SUPER TREND CHANGED : ${signal.toUpperCase()}`, '');
-      await createOrder(signal);
+      signal_type = signal;
+      sendEmail(`SUPER TREND CHANGED : ${signal}`, 'Signal Match');
+      await createOrder(signal.toLowerCase());
     }
 
     await updateOrderInfo(JSON.stringify({
@@ -238,8 +228,8 @@ async function checkSuperTrend() {
     }));
 
     triggerOrder(bitcoin_current_price);
-  } catch (error) {
-    console.log('checkSuperTrend error:', error.message);
+  } catch (err) {
+    console.log('❌ checkSuperTrend error:', err.message);
   }
 }
 
@@ -263,9 +253,7 @@ function init() {
     bitcoin_product_id = data.bitcoin_product_id;
     bitcoin_current_price = data.current_price ?? 0;
     signal_type = data.signal_type ?? '';
-    super_trend_over_interval = setInterval(async () => {
-      await checkSuperTrend();
-    }, 60000); // every 60 seconds
+    super_trend_over_interval = setInterval(checkSuperTrend, 30000);
   }
 }
 

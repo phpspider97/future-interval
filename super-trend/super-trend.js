@@ -13,7 +13,7 @@ const superTrendEmitter = new EventEmitter();
 const key = process.env.SUPER_TREND_WEB_KEY;
 const secret = process.env.SUPER_TREND_WEB_SECRET;
 const api_url = process.env.API_URL;
-const ORDER_SIZE = parseFloat(process.env.ORDER_SIZE || 1);
+const ORDER_SIZE = parseFloat(process.env.ORDER_SIZE || 2);
 
 let bitcoin_current_price = 0;
 let bitcoin_product_id = null;
@@ -156,12 +156,15 @@ async function createOrder(bidType) {
   try {
     await cancelAllOpenOrder();
     const timestamp = Math.floor(Date.now() / 1000);
+    const trail_amount = (bidType == 'buy')?'-200':'200'
     const bodyParams = {
       product_id: bitcoin_product_id,
       product_symbol: SYMBOL,
       size: ORDER_SIZE,
       side: bidType,
       order_type: "market_order",
+      trail_amount:trail_amount,
+      bracket_trail_amount:trail_amount
     };
     const signaturePayload = `POST${timestamp}/v2/orders${JSON.stringify(bodyParams)}`;
     const signature = await generateEncryptSignature(signaturePayload);
@@ -178,7 +181,7 @@ async function createOrder(bidType) {
       number_of_time_order_executed++;
       return { data: res.data, status: true };
     }
-
+    //console.log(res.data)
     return { message: "Order failed", status: false };
   } catch (error) {
     sendEmail(JSON.stringify(error.response?.data) + ' ==> ' + error.message, `ERROR CREATE ORDER`);
@@ -218,6 +221,7 @@ async function checkSuperTrend() {
       current_order_status = signal;
       signal_type = signal;
       sendEmail(`SUPER TREND CHANGED : ${signal}`, 'Signal Match');
+      //signal = 'buy'
       await createOrder(signal.toLowerCase());
     }
 

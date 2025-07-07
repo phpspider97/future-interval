@@ -36,7 +36,7 @@ let transporter = nodemailer.createTransport({
 
 async function fetchCandles() {
   const end_time_stamp = Math.floor(Date.now() / 1000);
-  const start_time_stamp = end_time_stamp - (10 * 60 * 60);
+  const start_time_stamp = end_time_stamp - (30 * 60 * 60);
   try {
     const response = await axios.get(`${api_url}/v2/history/candles`, {
       params: { symbol: SYMBOL, resolution: INTERVAL, start: start_time_stamp, end: end_time_stamp }
@@ -156,7 +156,7 @@ async function createOrder(bidType) {
   try {
     await cancelAllOpenOrder();
     const timestamp = Math.floor(Date.now() / 1000);
-    const trail_amount = (bidType == 'buy')?'-200':'200'
+    const trail_amount = (bidType == 'buy')?'-300':'300'
     const bodyParams = {
       product_id: bitcoin_product_id,
       product_symbol: SYMBOL,

@@ -119,12 +119,14 @@ function wsConnect() {
                     ws.close(1000, 'Too many errors');
                 } 
                 if(message.type == "orders"){  
+                    //console.log('message___',message)
                     if(message.state == 'closed' && message.meta_data.pnl != undefined){  
                         const side = message.side
+                        const size = message.size
                         const order_at = parseInt(message.limit_price)
                         const update_order_price = (side == 'buy')?order_at+profit_margin:order_at-profit_margin
 
-                        if(!is_price_out_of_grid && order_at <= upper_price && order_at >= lower_price){
+                        if(!is_price_out_of_grid && order_at <= upper_price && order_at >= lower_price && size != 10){
                             await createOrder((side == 'buy')?'sell':'buy',update_order_price)
                         } 
 
@@ -416,7 +418,7 @@ async function createOrder(bid_type,order_price){
         const bodyParams = {
             product_id : bitcoin_product_id,
             product_symbol : "BTCUSD",
-            size : 2, 
+            size : 1, 
             side : bid_type,   
             order_type : "limit_order",
             limit_price : order_price

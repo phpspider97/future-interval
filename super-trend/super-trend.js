@@ -5,7 +5,7 @@ const fs = require('fs');
 const nodemailer = require('nodemailer');
 const { ATR, EMA, RSI } = require('technicalindicators');
 const EventEmitter = require('events');
- 
+  
 const SYMBOL = 'BTCUSD';
 const INTERVAL = '1h';
 const superTrendEmitter = new EventEmitter();

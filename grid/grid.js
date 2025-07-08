@@ -51,7 +51,7 @@ const SOCKET_URL    =   process.env.API_URL_SOCKET
 const KEY           =   process.env.GRID_WEB_KEY
 const SECRET        =   process.env.GRID_WEB_SECRET 
 const USER_ID       =   process.env.GRID_WEB_USER_ID
- 
+  
 let bitcoin_product_id              =   0
 let bitcoin_option_product_id       =   0
 let bitcoin_option_product_symbol   =   ''

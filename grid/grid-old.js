@@ -16,7 +16,7 @@ let transporter = nodemailer.createTransport({
     pass: process.env.USER_PASSWORD
   },
 }) 
-
+  
 const lastSentTimestamps = {}
 const THROTTLE_INTERVAL_MS = 60 * 1000
 function sendEmail(message,subject){
@@ -60,8 +60,8 @@ let given_price_range               =   []
 let lower_price                     =   0 
 let upper_price                     =   0 
 let grid_spacing                    =   0
-let numberOfGrids                   =   11
-let profit_margin                   =   200
+let numberOfGrids                   =   22 
+let profit_margin                   =   300
 let stoploss_both_side              =   0
 let total_error_count               =   0 
 let number_of_time_order_executed   =   0
@@ -75,7 +75,7 @@ let stop_buy_option                 =   0
 let start_sell_option               =   0
 let stop_sell_option                =   0
 let store_data_for_testing          =   {}
-
+ 
 function wsConnect() { 
     const WEBSOCKET_URL = SOCKET_URL
     const API_KEY = KEY
@@ -113,21 +113,21 @@ function wsConnect() {
                 if(!is_live){ 
                     return true
                 } 
-                if(total_error_count > 3) {  
-                    console.log('total_error_count___',total_error_count)
+                if(total_error_count > 3) {   
                     is_live = false
                     fs.writeFileSync('./grid/orderInfo.json', '', 'utf8')
                     ws.close(1000, 'Too many errors');
                 } 
-                if(message.type == "orders"){  
+                if(message.type == "orders"){   
                     if(message.state == 'closed' && message.meta_data.pnl != undefined){  
                         const side = message.side
+                        const size = message.size
                         const order_at = parseInt(message.limit_price)
-                        
-                        const update_order_price = (side == 'buy')?order_at+profit_margin:order_at-profit_margin 
-                        if(!is_price_out_of_grid){  
+                        const update_order_price = (side == 'buy')?order_at+profit_margin:order_at-profit_margin
+
+                        if(!is_price_out_of_grid && order_at <= upper_price && order_at >= lower_price){
                             await createOrder((side == 'buy')?'sell':'buy',update_order_price)
-                        }
+                        } 
 
                         // if(start_buy_option == order_at && side == 'sell'){ 
                         //     const result = await getCurrentPriceOfBitcoin('put')
@@ -176,23 +176,26 @@ function wsConnect() {
                     let candle_current_price = message?.close
                     if ( given_price_range && given_price_range.length>0 && (candle_current_price > given_price_range[given_price_range.length-1]?.price+stoploss_both_side || candle_current_price < given_price_range[0]?.price-stoploss_both_side) && !is_price_out_of_grid ) {
                         is_price_out_of_grid = true
-                        sendEmail('',`PRICE OUT OF THE GRID NOW GRID STOP FOR 10 MINUTE`)
+                        //sendEmail('',`PRICE OUT OF THE GRID NOW GRID STOP FOR 10 MINUTE`)
                         //await cancelAllOpenOrder()
                         // setTimeout(async () => {
                         //     sendEmail('',`GRID CREATE AGAIN AFTER 10 MINUTE`)
                         //     await setRangeLimitOrder()
                         // }, 600000) 
                         // 10 min
-                    }else{
+                    }
+                    
+                    if ( given_price_range && given_price_range.length>0 && (candle_current_price < given_price_range[given_price_range.length-1]?.price+stoploss_both_side || candle_current_price > given_price_range[0]?.price-stoploss_both_side) && is_price_out_of_grid ) {
                         is_price_out_of_grid = false
                     }
+
                     triggerOrder(candle_current_price)
                 } 
             } 
         }catch(error){
             console.log('socket error : ', error.message)
         }
-    } 
+    }  
     async function onError(error) {
         await cancelAllOpenOrder()
         sendEmail(error.message??'',`SOCKET DEFAULT ERROR TRIGGERED`)
@@ -208,7 +211,8 @@ function wsConnect() {
         }
         console.log(`Socket closed with code: ${code}, reason: ${reason}`)
         if(code == 1000){
-            sendEmail(reason.toString(),`SOCKET CLOSED DUE TO TOO MANY ERROR`)
+            console.log('SOCKET CLOSED DUE TO TOO MANY ERRORR total_error_count',total_error_count)
+            sendEmail(reason.toString(),`SOCKET CLOSED DUE TO TOO MANY ERRORR`) 
             await cancelAllOpenOrder()
             setTimeout(() => {
                 total_error_count = 0 
@@ -251,19 +255,19 @@ function wsConnect() {
     ws.on('error', onError)
     ws.on('close', onClose)
 }
- 
+    
 async function cancelAllOpenOrder() {
     try {
-        given_price_range = [];
+        given_price_range = []; 
         const timestamp = Math.floor(Date.now() / 1000);
         const bodyParams = {
             close_all_portfolio: true,
             close_all_isolated: true,
             user_id: USER_ID,
-        }; 
+        };  
         const signaturePayload = `POST${timestamp}/v2/positions/close_all${JSON.stringify(bodyParams)}`;
         const signature = await generateEncryptSignature(signaturePayload);
-
+        //console.log('bodyParams___',bodyParams)
         const headers = {
             "api-key": KEY,
             "signature": signature,
@@ -271,28 +275,29 @@ async function cancelAllOpenOrder() {
             "Content-Type": "application/json",
             "Accept": "application/json",
         }; 
+        //console.log('headers___',headers)
         const response = await axios.post(`${API_URL}/v2/positions/close_all`, bodyParams, { headers });
         return { data: response.data, status: true };
     } catch (error) {
         sendEmail(error.message,`ERROR IN WHEN CANCEL ALL ORDER`)
         return { message: error.message + ' ' + JSON.stringify(error.response?.data) , status: false };
     }
-}
+} 
 
 function sleep(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
 }
  
 async function setRangeLimitOrder() {
-    try {
+    try { 
         await cancelAllOpenOrder()
-        const response = await axios.get(`${API_URL}/v2/tickers/BTCUSD`);
-        const current_price = Math.round(response?.data?.result?.close);  
+        const response = await axios.get(`${API_URL}/v2/tickers/BTCUSD`)
+        const current_price = Math.round(response?.data?.result?.close)  
         bitcoin_product_id = response.data.result.product_id;
         let round_of_current_price = roundedToHundred(current_price)  
-        upper_price       =  round_of_current_price + 1200
-        lower_price       =  round_of_current_price - 1000
-        grid_spacing      =  (upper_price - lower_price) / numberOfGrids;
+        upper_price       =  round_of_current_price + 3300
+        lower_price       =  round_of_current_price - 3300
+        grid_spacing      =  (upper_price - lower_price) / numberOfGrids
          
         for (let i = 0; i < numberOfGrids; i++) {
             const rawBuyPrice = lower_price + i * grid_spacing
@@ -302,26 +307,52 @@ async function setRangeLimitOrder() {
                     buy  : false,
                     sell : false
                 }
-            }); 
+            });  
         }
   
-        const first_five = given_price_range.slice(0, 5)
-        const last_five = given_price_range.slice(-5)
+        const first_five = given_price_range.slice(1, 11)
+        const last_five = given_price_range.slice(-10)
 
         // console.log('current_price___',current_price)
         // console.log('first_five___',first_five)
         // console.log('last_five___',last_five)
 
-        first_five.forEach(async (data)=>{
-            order_in_progress = false
-            await createOrder('buy',data.price)
-            await sleep(500)
-        })
-        last_five.forEach(async (data)=>{
-            order_in_progress = false
-            await createOrder('sell',data.price)
-            await sleep(500)
-        })
+        // await Promise.all(first_five.map(async (data) => {
+        //     order_in_progress = false;
+        //     await createOrder('buy', data.price);
+        //     await sleep(11500);
+        // }));
+
+        // await Promise.all(last_five.map(async (data) => {
+        //     order_in_progress = false;
+        //     await createOrder('sell', data.price);
+        //     await sleep(11500);
+        // }));
+
+        for (const data of first_five) {
+            order_in_progress = false;
+            await createOrder('buy', data.price);
+            await sleep(500);
+        }
+        
+        for (const data of last_five) {
+            order_in_progress = false;
+            await createOrder('sell', data.price);
+            await sleep(500);
+        }
+        
+
+        
+        // first_five.forEach(async (data)=>{
+        //     order_in_progress = false
+        //     await createOrder('buy',data.price)
+        //     await sleep(11500)
+        // })
+        // last_five.forEach(async (data)=>{
+        //     order_in_progress = false
+        //     await createOrder('sell',data.price)
+        //     await sleep(11500)
+        // })
 
         // const put_result = await getCurrentPriceOfBitcoin('put',1200)
         // if(put_result.data.option_data != undefined){
@@ -373,6 +404,7 @@ async function generateEncryptSignature(signaturePayload) {
     return crypto.createHmac("sha256", SECRET).update(signaturePayload).digest("hex");
 }
 async function createOrder(bid_type,order_price){
+    //console.log('create_order_total_error_count___',total_error_count)
     if(total_error_count>3){
         return true
     } 
@@ -385,7 +417,7 @@ async function createOrder(bid_type,order_price){
         const bodyParams = {
             product_id : bitcoin_product_id,
             product_symbol : "BTCUSD",
-            size : 1, 
+            size : 3, 
             side : bid_type,   
             order_type : "limit_order",
             limit_price : order_price
@@ -407,149 +439,19 @@ async function createOrder(bid_type,order_price){
         if (response.data.success) { 
             number_of_time_order_executed++  
             return { data: response.data, status: true }
-        }
+        } 
         return { message: "Order failed", status: false }
     } catch (error) {
-        console.log('error : ',error.response.data)
-        sendEmail(error.message +' '+JSON.stringify(body_param_for_testing),`ERROR IN WHEN CREATING ORDER`) 
+        console.log('total_error_count____',error.response.data)
+        sendEmail(error.message +' '+JSON.stringify(body_param_for_testing),`ERROR IN WHEN CREATING ORDER : ${JSON.stringify(body_param_for_testing)}`) 
         total_error_count++ 
         order_in_progress = false;  
         return { message: error?.message, status: false }
     } finally {
         order_in_progress = false;
     }
-}
-
-async function createOptionOrder(product_id,bitcoin_option_symbol,side='sell') { 
-    // if (order_in_progress){ 
-    //     return true
-    // }
-    // order_in_progress = true
-     
-    try { 
-        const timestamp = Math.floor(Date.now() / 1000);
-        const bodyParams = {
-            product_id: product_id??0, 
-            product_symbol: bitcoin_option_symbol??'', 
-            size: 15,
-            side: side, 
-            order_type: "market_order"
-        } 
-        //console.log('bodyParams___',bodyParams)
-
-        body_param_for_testing = bodyParams
-        const signaturePayload = `POST${timestamp}/v2/orders${JSON.stringify(bodyParams)}`;
-        const signature = await generateEncryptSignature(signaturePayload);
-
-        const headers = {
-            "api-key": KEY,
-            "signature": signature,
-            "timestamp": timestamp,
-            "Content-Type": "application/json",
-            "Accept": "application/json",
-        };
-        const response = await axios.post(`${API_URL}/v2/orders`, bodyParams, { headers });
-        
-        if (response.data.success) {  
-            const message_template = `<br /><br /><br />
-            <table border="1" cellpadding="8" cellspacing="3">
-                <tr>
-                    <td>Product Symbol</td>
-                    <td>:</td>
-                    <td>${bitcoin_option_symbol}</td> 
-                </tr>
-                <tr>
-                    <td>Size</td>
-                    <td>:</td>
-                    <td>8</td> 
-                </tr> 
-            </table>
-            ` 
-            sendEmail(message_template,`CREATE OPTION ORDER FROM LESS LOSS : ${bitcoin_option_symbol}`)
-            number_of_time_order_executed++
-            return { data: response.data, status: true }
-        }
-        return { message: "Order failed", status: false };
-    } catch (error) {
-        sendEmail(error.message + ' ' + JSON.stringify(body_param_for_testing),`ERROR IN WHEN CREATING OPTION ORDER IN GRID`) 
-        total_error_count++ 
-        order_in_progress = false; 
-        return { message: error?.message, status: false };
-    } finally {
-        order_in_progress = false;
-    }
-}
+} 
  
-function getAdjustedDate() { 
-    const now = new Date()
-    const currentHour = now.getHours()
- 
-    const targetDate = new Date(now)
-    if (currentHour >= 18) {
-        targetDate.setDate(targetDate.getDate() + 1);
-    }
- 
-    const day = String(targetDate.getDate()).padStart(2, '0');
-    const month = String(targetDate.getMonth() + 1).padStart(2, '0');
-    const year = targetDate.getFullYear();
-   
-    return `${day}-${month}-${year}`;
-}
-
-async function getCurrentPriceOfBitcoin(data_type,price_addition=0) {
-    try { 
-        const expiry_date = getAdjustedDate()  
-        const response = await axios.get(`${API_URL}/v2/tickers/?underlying_asset_symbols=BTC&contract_types=call_options,put_options&states=live&expiry_date=${expiry_date}`)
-        const allProducts = response.data.result
-        
-        const spot_price = Math.round(allProducts[0].spot_price / 200) * 200
-         
-        console.log('url',`${API_URL}/v2/tickers/?underlying_asset_symbols=BTC&contract_types=call_options,put_options&states=live&expiry_date=${expiry_date}`)
-        //console.log('allProducts___',allProducts)
-        console.log('spot_price___',spot_price)
-        console.log('data_type___',data_type)
-        
-        let option_data = []
-        if(data_type == 'call'){ 
-            option_data = allProducts.filter(product =>
-                product.contract_type == 'call_options' && product.strike_price == spot_price+200
-            ); 
-        }else if(data_type == 'put'){ 
-            option_data = allProducts.filter(product =>
-                product.contract_type == 'put_options' && product.strike_price == spot_price-200
-            ); 
-        } 
-        const bitcoin_option_data = {
-            option_data : option_data[0]
-        } 
-
-        console.log('bitcoin_option_data___',bitcoin_option_data)
-        return { data: bitcoin_option_data, status: true }
-    } catch (error) {
-        sendEmail(error.message,`ERROR IN GETTING BITCOIN INFORMATION`) 
-        return { message: error.message, status: false }
-    }
-}
-
-async function getBalance() {
-    try {   
-        const timestamp = Math.floor(Date.now() / 1000)
-        const signaturePayload = `GET${timestamp}/v2/wallet/balances`;
-        const signature = await generateEncryptSignature(signaturePayload);
-
-        const headers = {
-            "api-key": KEY,
-            "signature": signature,
-            "timestamp": timestamp,
-            "Content-Type": "application/json",
-            "Accept": "application/json",
-        }; 
-        const response = await axios.get(`${API_URL}/v2/wallet/balances`, { headers })
-        return response.data.result[0].balance_inr
-    } catch (error) {
-        sendEmail(error.message,`ERROR IN WHEN GET BALANCE`)
-    }
-}
  
 (async function() {
     // const result = await getCurrentPriceOfBitcoin('call')
@@ -588,7 +490,8 @@ async function updateOrderInfo(content){
 }
 async function socketEventInfo(current_price){
     let order_data = {}
-    let current_balance = await getBalance() 
+    //let current_balance = await getBalance() 
+    let current_balance = 100000
     is_live = (fs.statSync('./grid/orderInfo.json').size != 0)?true:false
     if(is_live){
         order_data = fs.readFileSync('./grid/orderInfo.json', 'utf8')
@@ -624,6 +527,7 @@ gridEmitter.on("grid_start", async () => {
 })
 
 gridEmitter.on("grid_stop", async () => { 
+    total_error_count = 0
     await cancelAllOpenOrder() 
     fs.writeFileSync('./grid/orderInfo.json', '', 'utf8')
     sendEmail('',`BOT STOP BUTTON PRESSED`)

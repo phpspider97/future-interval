@@ -75,7 +75,7 @@ let stop_buy_option                 =   0
 let start_sell_option               =   0
 let stop_sell_option                =   0
 let store_data_for_testing          =   {}
-
+ 
 function wsConnect() { 
     const WEBSOCKET_URL = SOCKET_URL
     const API_KEY = KEY
@@ -118,7 +118,7 @@ function wsConnect() {
                     is_live = false
                     fs.writeFileSync('./grid/orderInfo.json', '', 'utf8')
                     ws.close(1000, 'Too many errors');
-                } 
+                }  
                 if(message.type == "orders"){  
                     if(message.state == 'closed' && message.meta_data.pnl != undefined){  
                         const side = message.side

@@ -7,7 +7,7 @@ const { ATR, EMA, RSI } = require('technicalindicators');
 const EventEmitter = require('events');
  
 const SYMBOL = 'BTCUSD';
-const INTERVAL = '15m';
+const INTERVAL = '1h';
 const superTrendEmitter = new EventEmitter();
 
 const key = process.env.SUPER_TREND_WEB_KEY;
@@ -163,8 +163,8 @@ async function createOrder(bidType) {
       size: ORDER_SIZE,
       side: bidType,
       order_type: "market_order",
-      trail_amount:trail_amount,
-      bracket_trail_amount:trail_amount
+      //trail_amount:trail_amount,
+      //bracket_trail_amount:trail_amount
     };
     const signaturePayload = `POST${timestamp}/v2/orders${JSON.stringify(bodyParams)}`;
     const signature = await generateEncryptSignature(signaturePayload);

@@ -51,7 +51,7 @@ const SOCKET_URL    =   process.env.API_URL_SOCKET
 const KEY           =   process.env.GRID_WEB_KEY
 const SECRET        =   process.env.GRID_WEB_SECRET 
 const USER_ID       =   process.env.GRID_WEB_USER_ID
-  
+ 
 let bitcoin_product_id              =   0
 let bitcoin_option_product_id       =   0
 let bitcoin_option_product_symbol   =   ''
@@ -129,21 +129,21 @@ function wsConnect() {
                             await createOrder((side == 'buy')?'sell':'buy',update_order_price)
                         }
 
-                        if(start_buy_option == order_at && side == 'sell'){ 
-                            const result = await getCurrentPriceOfBitcoin('call')
-                            if (!result.status) return;
-                            bitcoin_option_product_id = result?.data?.option_data?.product_id
-                            bitcoin_option_product_symbol = result?.data?.option_data?.symbol
-                            await createOptionOrder(result?.data?.option_data?.product_id,result?.data?.option_data?.symbol,'buy')
-                        }
+                        // if(start_buy_option == order_at && side == 'sell'){ 
+                        //     const result = await getCurrentPriceOfBitcoin('call')
+                        //     if (!result.status) return;
+                        //     bitcoin_option_product_id = result?.data?.option_data?.product_id
+                        //     bitcoin_option_product_symbol = result?.data?.option_data?.symbol
+                        //     await createOptionOrder(result?.data?.option_data?.product_id,result?.data?.option_data?.symbol,'buy')
+                        // }
                         
-                        if(start_sell_option == order_at && side == 'buy'){
-                            const result = await getCurrentPriceOfBitcoin('put')
-                            if (!result.status) return;
-                            bitcoin_option_product_id = result?.data?.option_data?.product_id
-                            bitcoin_option_product_symbol = result?.data?.option_data?.symbol
-                            await createOptionOrder(result?.data?.option_data?.product_id,result?.data?.option_data?.symbol,'buy')
-                        }
+                        // if(start_sell_option == order_at && side == 'buy'){
+                        //     const result = await getCurrentPriceOfBitcoin('put')
+                        //     if (!result.status) return;
+                        //     bitcoin_option_product_id = result?.data?.option_data?.product_id
+                        //     bitcoin_option_product_symbol = result?.data?.option_data?.symbol
+                        //     await createOptionOrder(result?.data?.option_data?.product_id,result?.data?.option_data?.symbol,'buy')
+                        // }
     
                         // if(stop_buy_option == order_at && side == 'buy' && bitcoin_option_product_id != 0 && bitcoin_option_product_symbol != ''){
                         //     await createOptionOrder(bitcoin_option_product_id,bitcoin_option_product_symbol,'buy')
@@ -176,7 +176,7 @@ function wsConnect() {
                     let candle_current_price = message?.close
                     if ( given_price_range && given_price_range.length>0 && (candle_current_price > given_price_range[given_price_range.length-1]?.price+stoploss_both_side || candle_current_price < given_price_range[0]?.price-stoploss_both_side) && !is_price_out_of_grid ) {
                         is_price_out_of_grid = true
-                        sendEmail('',`PRICE OUT OF THE GRID NOW GRID STOP FOR 10 MINUTE`)
+                        //sendEmail('',`PRICE OUT OF THE GRID NOW GRID STOP FOR 10 MINUTE`)
                         //await cancelAllOpenOrder()
                         // setTimeout(async () => {
                         //     sendEmail('',`GRID CREATE AGAIN AFTER 10 MINUTE`)
@@ -385,7 +385,7 @@ async function createOrder(bid_type,order_price){
         const bodyParams = {
             product_id : bitcoin_product_id,
             product_symbol : "BTCUSD",
-            size : 2, 
+            size : 4, 
             side : bid_type,   
             order_type : "limit_order",
             limit_price : order_price

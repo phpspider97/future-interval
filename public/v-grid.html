@@ -134,13 +134,13 @@
     }, 100)
 
     function startFetching() {  
-        socket.emit("grid_start")
+        socket.emit("v_grid_start")
         setTimeout(() => {
             location.reload();
         }, 2000)
     }
     function stopFetching() {  
-        socket.emit("grid_stop")
+        socket.emit("v_grid_stop")
         setTimeout(() => {
             location.reload();
         }, 2000)

@@ -7,7 +7,7 @@ const fs = require('fs')
 const nodemailer = require('nodemailer')
 
 const EventEmitter = require('events')
-const gridEmitter = new EventEmitter()
+const vgridEmitter = new EventEmitter()
 
 let transporter = nodemailer.createTransport({
   service: 'gmail',
@@ -24,7 +24,7 @@ function sendEmail(message,subject){
         const now = Date.now();
         const subjectKey = subject.trim().toLowerCase();
         if (lastSentTimestamps[subjectKey] && now - lastSentTimestamps[subjectKey] < THROTTLE_INTERVAL_MS) {
-            console.log(`GRID BOT : Throttled: Email with subject "${subject}" was sent recently.`);
+            console.log(`VANITA GRID BOT : Throttled: Email with subject "${subject}" was sent recently.`);
             return;
         }
         lastSentTimestamps[subjectKey] = now;
@@ -48,9 +48,9 @@ function sendEmail(message,subject){
 
 const API_URL       =   process.env.API_URL 
 const SOCKET_URL    =   process.env.API_URL_SOCKET 
-const KEY           =   process.env.GRID_WEB_KEY
-const SECRET        =   process.env.GRID_WEB_SECRET 
-const USER_ID       =   process.env.GRID_WEB_USER_ID
+const KEY           =   process.env.V_GRID_WEB_KEY
+const SECRET        =   process.env.V_GRID_WEB_SECRET 
+const USER_ID       =   process.env.V_GRID_WEB_USER_ID
  
 let bitcoin_product_id              =   0
 let bitcoin_option_product_id       =   0
@@ -385,7 +385,7 @@ async function createOrder(bid_type,order_price){
         const bodyParams = {
             product_id : bitcoin_product_id,
             product_symbol : "BTCUSD",
-            size : 6, 
+            size : 2, 
             side : bid_type,   
             order_type : "limit_order",
             limit_price : order_price
@@ -596,7 +596,7 @@ async function socketEventInfo(current_price){
     } 
     //let current_trend = await classifyLastCandle()
     let current_trend = "Neutral"
-    gridEmitter.emit("grid_trade_info", {
+    vgridEmitter.emit("grid_trade_info", {
         balance : current_balance,
         product_symbol : "BTCUSD",
         bitcoin_product_id : order_data.bitcoin_product_id??0,
@@ -616,14 +616,14 @@ async function triggerOrder(current_price) {
     }
 }
 
-gridEmitter.on("grid_start", async () => { 
+vgridEmitter.on("v_grid_start", async () => { 
     await setRangeLimitOrder()
     is_live = true 
     wsConnect()
     sendEmail('',`BOT START BUTTON PRESSED`)
 })
 
-gridEmitter.on("grid_stop", async () => { 
+vgridEmitter.on("v_grid_stop", async () => { 
     total_error_count = 0
     await cancelAllOpenOrder() 
     fs.writeFileSync('./grid/orderInfo.json', '', 'utf8')
@@ -631,4 +631,4 @@ gridEmitter.on("grid_stop", async () => {
     is_live = false 
 })
 
-module.exports = { gridEmitter }
+module.exports = { vgridEmitter }

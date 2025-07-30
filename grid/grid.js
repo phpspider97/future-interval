@@ -121,14 +121,14 @@ function wsConnect() {
                 }  
                 if(message.type == "orders"){  
                     if(message.state == 'closed' && message.meta_data.pnl != undefined){  
-                        console.log('message____',message)
+                        //console.log('message____',message)
                         const side = message.side
                         const size = message.size
                         const order_at = parseInt(message.limit_price)
                         
                         const update_order_price = (side == 'buy')?order_at+profit_margin:order_at-profit_margin 
                         if(!is_price_out_of_grid && order_at <= upper_price && order_at >= lower_price){  
-                            console.log('size____ : ',size)
+                            //console.log('size____ : ',size)
                             await createOrder((side == 'buy')?'sell':'buy',update_order_price,size)
                         }
 
@@ -317,12 +317,12 @@ async function setRangeLimitOrder() {
 
         first_five.forEach(async (data)=>{
             order_in_progress = false
-            await createOrder('buy',data.price,1)
+            await createOrder('buy',data.price,6)
             await sleep(500)
         })
         last_five.forEach(async (data)=>{
             order_in_progress = false
-            await createOrder('sell',data.price,1)
+            await createOrder('sell',data.price,6)
             await sleep(500)
         })
 

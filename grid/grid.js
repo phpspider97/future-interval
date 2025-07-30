@@ -121,12 +121,15 @@ function wsConnect() {
                 }  
                 if(message.type == "orders"){  
                     if(message.state == 'closed' && message.meta_data.pnl != undefined){  
+                        console.log('message____',message)
                         const side = message.side
+                        const size = message.size
                         const order_at = parseInt(message.limit_price)
                         
                         const update_order_price = (side == 'buy')?order_at+profit_margin:order_at-profit_margin 
                         if(!is_price_out_of_grid && order_at <= upper_price && order_at >= lower_price){  
-                            await createOrder((side == 'buy')?'sell':'buy',update_order_price)
+                            console.log('size____ : ',size)
+                            await createOrder((side == 'buy')?'sell':'buy',update_order_price,size)
                         }
 
                         // if(start_buy_option == order_at && side == 'sell'){ 
@@ -314,12 +317,12 @@ async function setRangeLimitOrder() {
 
         first_five.forEach(async (data)=>{
             order_in_progress = false
-            await createOrder('buy',data.price)
+            await createOrder('buy',data.price,1)
             await sleep(500)
         })
         last_five.forEach(async (data)=>{
             order_in_progress = false
-            await createOrder('sell',data.price)
+            await createOrder('sell',data.price,1)
             await sleep(500)
         })
 
@@ -372,7 +375,7 @@ async function setRangeLimitOrder() {
 async function generateEncryptSignature(signaturePayload) { 
     return crypto.createHmac("sha256", SECRET).update(signaturePayload).digest("hex");
 }
-async function createOrder(bid_type,order_price){
+async function createOrder(bid_type,order_price,size){
     if(total_error_count>3){
         return true
     } 
@@ -385,7 +388,7 @@ async function createOrder(bid_type,order_price){
         const bodyParams = {
             product_id : bitcoin_product_id,
             product_symbol : "BTCUSD",
-            size : 6, 
+            size : size, 
             side : bid_type,   
             order_type : "limit_order",
             limit_price : order_price

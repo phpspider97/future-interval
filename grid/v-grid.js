@@ -116,17 +116,18 @@ function wsConnect() {
                 if(total_error_count > 3) {   
                     console.log('total_error_count___',total_error_count)
                     is_live = false
-                    fs.writeFileSync('./grid/orderInfo.json', '', 'utf8')
+                    fs.writeFileSync('./grid/v-orderInfo.json', '', 'utf8')
                     ws.close(1000, 'Too many errors');
                 }  
                 if(message.type == "orders"){  
                     if(message.state == 'closed' && message.meta_data.pnl != undefined){  
                         const side = message.side
+                        const size = message.size
                         const order_at = parseInt(message.limit_price)
                         
                         const update_order_price = (side == 'buy')?order_at+profit_margin:order_at-profit_margin 
                         if(!is_price_out_of_grid && order_at <= upper_price && order_at >= lower_price){  
-                            await createOrder((side == 'buy')?'sell':'buy',update_order_price)
+                            await createOrder((side == 'buy')?'sell':'buy',update_order_price,size)
                         }
 
                         // if(start_buy_option == order_at && side == 'sell'){ 
@@ -314,12 +315,12 @@ async function setRangeLimitOrder() {
 
         first_five.forEach(async (data)=>{
             order_in_progress = false
-            await createOrder('buy',data.price)
+            await createOrder('buy',data.price,4)
             await sleep(500)
         })
         last_five.forEach(async (data)=>{
             order_in_progress = false
-            await createOrder('sell',data.price)
+            await createOrder('sell',data.price,4)
             await sleep(500)
         })
 
@@ -372,7 +373,7 @@ async function setRangeLimitOrder() {
 async function generateEncryptSignature(signaturePayload) { 
     return crypto.createHmac("sha256", SECRET).update(signaturePayload).digest("hex");
 }
-async function createOrder(bid_type,order_price){
+async function createOrder(bid_type,order_price,size){
     if(total_error_count>3){
         return true
     } 
@@ -385,7 +386,7 @@ async function createOrder(bid_type,order_price){
         const bodyParams = {
             product_id : bitcoin_product_id,
             product_symbol : "BTCUSD",
-            size : 2, 
+            size : size, 
             side : bid_type,   
             order_type : "limit_order",
             limit_price : order_price
@@ -563,10 +564,10 @@ async function getBalance() {
     //     await createOptionOrder(bitcoin_option_product_id,bitcoin_option_product_symbol,'buy')
     // }, 10000)
 
-    is_live = (fs.statSync('./grid/orderInfo.json').size != 0)?true:false
+    is_live = (fs.statSync('./grid/v-orderInfo.json').size != 0)?true:false
     if(is_live){
         wsConnect()
-        let order_data = fs.readFileSync('./grid/orderInfo.json', 'utf8')
+        let order_data = fs.readFileSync('./grid/v-orderInfo.json', 'utf8')
         order_data = JSON.parse(order_data) 
         
         bitcoin_product_id = order_data.bitcoin_product_id
@@ -578,7 +579,7 @@ async function getBalance() {
 })();
 
 async function updateOrderInfo(content){
-    fs.writeFile('./grid/orderInfo.json', content, (error) => {
+    fs.writeFile('./grid/v-orderInfo.json', content, (error) => {
         if (error) {
             sendEmail(JSON.stringify(error),`ERROR IN WHEN UPDATE ORDER FILE`)
         } else {
@@ -589,9 +590,9 @@ async function updateOrderInfo(content){
 async function socketEventInfo(current_price){
     let order_data = {}
     let current_balance = 100000 
-    is_live = (fs.statSync('./grid/orderInfo.json').size != 0)?true:false
+    is_live = (fs.statSync('./grid/v-orderInfo.json').size != 0)?true:false
     if(is_live){
-        order_data = fs.readFileSync('./grid/orderInfo.json', 'utf8')
+        order_data = fs.readFileSync('./grid/v-orderInfo.json', 'utf8')
         order_data = JSON.parse(order_data) 
     } 
     //let current_trend = await classifyLastCandle()
@@ -626,7 +627,7 @@ vgridEmitter.on("v_grid_start", async () => {
 vgridEmitter.on("v_grid_stop", async () => { 
     total_error_count = 0
     await cancelAllOpenOrder() 
-    fs.writeFileSync('./grid/orderInfo.json', '', 'utf8')
+    fs.writeFileSync('./grid/v-orderInfo.json', '', 'utf8')
     sendEmail('',`BOT STOP BUTTON PRESSED`)
     is_live = false 
 })

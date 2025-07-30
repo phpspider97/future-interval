@@ -4,6 +4,8 @@
         "future/orderInfo.json",
         "option/orderInfo.json",
         "grid/orderInfo.json",
+        "grid/v-orderInfo.json",
+        "grid/g-orderInfo.json",
         "super-trend/orderInfo.json"
     ]
 }  

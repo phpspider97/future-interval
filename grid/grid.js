@@ -321,7 +321,7 @@ async function setRangeLimitOrder() {
         // console.log('current_price___',current_price)
         // console.log('first_five___',first_five)
         // console.log('last_five___',last_five)
-
+ 
         first_five.forEach(async (data)=>{
             order_in_progress = false
             await createOrder('buy',data.price,6)

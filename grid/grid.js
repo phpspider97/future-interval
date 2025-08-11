@@ -180,11 +180,11 @@ function wsConnect() {
                     if ( given_price_range && given_price_range.length>0 && (candle_current_price > given_price_range[given_price_range.length-1]?.price+stoploss_both_side || candle_current_price < given_price_range[0]?.price-stoploss_both_side) && !is_price_out_of_grid ) {
                         is_price_out_of_grid = true
 
-                        total_error_count = 0
-                        await cancelAllOpenOrder() 
-                        fs.writeFileSync('./grid/orderInfo.json', '', 'utf8')
-                        sendEmail('',`BOT STOP BECAUSE OUT OF GRID`)
-                        is_live = false 
+                        // total_error_count = 0
+                        // await cancelAllOpenOrder() 
+                        // fs.writeFileSync('./grid/orderInfo.json', '', 'utf8')
+                        // sendEmail('',`BOT STOP BECAUSE OUT OF GRID`)
+                        // is_live = false 
 
                         //sendEmail('',`PRICE OUT OF THE GRID NOW GRID STOP FOR 10 MINUTE`)
                         //await cancelAllOpenOrder()

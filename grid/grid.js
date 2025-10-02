@@ -120,17 +120,17 @@ function wsConnect() {
                     ws.close(1000, 'Too many errors');
                 }  
                 if(message.type == "orders"){  
-                    console.log('enter1',message.state,message.meta_data.pnl)
+                    //console.log('enter1',message.state,message.meta_data.pnl)
                     if(message.state == 'closed' && message.meta_data.pnl != undefined){  
-                        console.log('enter2')
-                        console.log('message____',message)
+                        //console.log('enter2')
+                        //console.log('message____',message)
                         const side = message.side
                         const size = message.size
                         const order_at = parseInt(message.limit_price)
-                        console.log('order_at___',order_at)
+                        //console.log('order_at___',order_at)
                         const update_order_price = (side == 'buy')?order_at+profit_margin:order_at-profit_margin 
                         if(!is_price_out_of_grid && order_at <= upper_price && order_at >= lower_price){  
-                            console.log('size____ : ',size,update_order_price)
+                            //console.log('size____ : ',size,update_order_price)
                             await createOrder((side == 'buy')?'sell':'buy',update_order_price,size,true)
                         }
 
@@ -337,13 +337,13 @@ async function setRangeLimitOrder() {
 
         for (const data of first_five) {
             order_in_progress = false;
-            await createOrder('buy', data.price,1);
+            await createOrder('buy', data.price,4);
             await sleep(500);
         }
         
         for (const data of last_five) {
             order_in_progress = false;
-            await createOrder('sell', data.price,1);
+            await createOrder('sell', data.price,4);
             await sleep(500);
         }
 

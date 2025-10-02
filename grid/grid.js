@@ -125,10 +125,10 @@ function wsConnect() {
                         const side = message.side
                         const size = message.size
                         const order_at = parseInt(message.limit_price)
-                        
+                        console.log('order_at___',order_at)
                         const update_order_price = (side == 'buy')?order_at+profit_margin:order_at-profit_margin 
                         if(!is_price_out_of_grid && order_at <= upper_price && order_at >= lower_price){  
-                            //console.log('size____ : ',size)
+                            console.log('size____ : ',size,update_order_price)
                             await createOrder((side == 'buy')?'sell':'buy',update_order_price,size)
                         }
 
@@ -401,6 +401,7 @@ async function createOrder(bid_type,order_price,size){
             limit_price : order_price
         } 
         body_param_for_testing = bodyParams
+        console.log('body_param_for_testing: ',body_param_for_testing)
         const signaturePayload = `POST${timestamp}/v2/orders${JSON.stringify(bodyParams)}`;
         const signature = await generateEncryptSignature(signaturePayload);
 
@@ -420,16 +421,16 @@ async function createOrder(bid_type,order_price,size){
         }
         return { message: "Order failed", status: false }
     } catch (error) {
-        console.log('error : ',error) 
+        //console.log('error : ',error) 
         console.log('error 2 : ',error.response.data) 
 
-        const errData = error?.response?.data || {};
-        const errStatus = error?.response?.status || 'NO_STATUS';
-        const errMsg = error?.message || 'Unknown Error';
+        // const errData = error?.response?.data || {};
+        // const errStatus = error?.response?.status || 'NO_STATUS';
+        // const errMsg = error?.message || 'Unknown Error';
 
-        console.error('Error Status : ', errStatus);
-        console.error('Error Data   : ', errData);
-        console.error('Error Msg    : ', errMsg);
+        // console.error('Error Status : ', errStatus);
+        // console.error('Error Data   : ', errData);
+        // console.error('Error Msg    : ', errMsg);
 
         sendEmail(error.message +' '+JSON.stringify(body_param_for_testing),`ERROR IN WHEN CREATING ORDER`) 
         total_error_count++ 

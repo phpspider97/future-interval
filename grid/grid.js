@@ -413,13 +413,14 @@ async function createOrder(bid_type,order_price,size){
         } 
          
         const response = await axios.post(`${API_URL}/v2/orders`, bodyParams, { headers })
-        //console.log('create order : ',response.data)
+        console.log('create order : ',response.data, body_param_for_testing)
         if (response.data.success) { 
             number_of_time_order_executed++  
             return { data: response.data, status: true }
         }
         return { message: "Order failed", status: false }
     } catch (error) {
+        console.log('error : ',error) 
         console.log('error 2 : ',error.response.data) 
 
         const errData = error?.response?.data || {};

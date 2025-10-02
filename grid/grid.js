@@ -131,7 +131,7 @@ function wsConnect() {
                         const update_order_price = (side == 'buy')?order_at+profit_margin:order_at-profit_margin 
                         if(!is_price_out_of_grid && order_at <= upper_price && order_at >= lower_price){  
                             console.log('size____ : ',size,update_order_price)
-                            await createOrder((side == 'buy')?'sell':'buy',update_order_price,size)
+                            await createOrder((side == 'buy')?'sell':'buy',update_order_price,size,true)
                         }
 
                         // if(start_buy_option == order_at && side == 'sell'){ 
@@ -384,7 +384,10 @@ async function setRangeLimitOrder() {
 async function generateEncryptSignature(signaturePayload) { 
     return crypto.createHmac("sha256", SECRET).update(signaturePayload).digest("hex");
 }
-async function createOrder(bid_type,order_price,size){
+async function createOrder(bid_type,order_price,size,byDynamic=false){
+    if(byDynamic){
+        console.log('total_error_count___',total_error_count)
+    }
     if(total_error_count>3){
         return true
     } 
@@ -403,7 +406,9 @@ async function createOrder(bid_type,order_price,size){
             limit_price : order_price
         } 
         body_param_for_testing = bodyParams
-        console.log('body_param_for_testing: ',body_param_for_testing)
+        if(byDynamic){
+            console.log('body_param_for_testing: ',body_param_for_testing)
+        }
         const signaturePayload = `POST${timestamp}/v2/orders${JSON.stringify(bodyParams)}`;
         const signature = await generateEncryptSignature(signaturePayload);
 

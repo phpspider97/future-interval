@@ -121,7 +121,7 @@ function wsConnect() {
                 }  
                 if(message.type == "orders"){  
                     if(message.state == 'closed' && message.meta_data.pnl != undefined){  
-                        //console.log('message____',message)
+                        console.log('message____',message)
                         const side = message.side
                         const size = message.size
                         const order_at = parseInt(message.limit_price)
@@ -420,7 +420,16 @@ async function createOrder(bid_type,order_price,size){
         }
         return { message: "Order failed", status: false }
     } catch (error) {
-        console.log('error : ',error.response.data)
+        console.log('error 2 : ',error.response.data) 
+
+        const errData = error?.response?.data || {};
+        const errStatus = error?.response?.status || 'NO_STATUS';
+        const errMsg = error?.message || 'Unknown Error';
+
+        console.error('Error Status : ', errStatus);
+        console.error('Error Data   : ', errData);
+        console.error('Error Msg    : ', errMsg);
+
         sendEmail(error.message +' '+JSON.stringify(body_param_for_testing),`ERROR IN WHEN CREATING ORDER`) 
         total_error_count++ 
         order_in_progress = false;  

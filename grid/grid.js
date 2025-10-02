@@ -324,16 +324,28 @@ async function setRangeLimitOrder() {
         // console.log('first_five___',first_five)
         // console.log('last_five___',last_five)
  
-        first_five.forEach(async (data)=>{
-            order_in_progress = false
-            await createOrder('buy',data.price,1)
-            await sleep(500)
-        })
-        last_five.forEach(async (data)=>{
-            order_in_progress = false
-            await createOrder('sell',data.price,1)
-            await sleep(500)
-        })
+        // first_five.forEach(async (data)=>{
+        //     order_in_progress = false
+        //     await createOrder('buy',data.price,1)
+        //     await sleep(500)
+        // })
+        // last_five.forEach(async (data)=>{
+        //     order_in_progress = false
+        //     await createOrder('sell',data.price,1)
+        //     await sleep(500)
+        // })
+
+        for (const data of first_five) {
+            order_in_progress = false;
+            await createOrder('buy', data.price,1);
+            await sleep(500);
+        }
+        
+        for (const data of last_five) {
+            order_in_progress = false;
+            await createOrder('sell', data.price,1);
+            await sleep(500);
+        }
 
         // const put_result = await getCurrentPriceOfBitcoin('put',1200)
         // if(put_result.data.option_data != undefined){

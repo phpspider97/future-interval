@@ -120,7 +120,9 @@ function wsConnect() {
                     ws.close(1000, 'Too many errors');
                 }  
                 if(message.type == "orders"){  
+                    console.log('enter1')
                     if(message.state == 'closed' && message.meta_data.pnl != undefined){  
+                        console.log('enter2')
                         console.log('message____',message)
                         const side = message.side
                         const size = message.size
@@ -324,12 +326,12 @@ async function setRangeLimitOrder() {
  
         first_five.forEach(async (data)=>{
             order_in_progress = false
-            await createOrder('buy',data.price,4)
+            await createOrder('buy',data.price,1)
             await sleep(500)
         })
         last_five.forEach(async (data)=>{
             order_in_progress = false
-            await createOrder('sell',data.price,4)
+            await createOrder('sell',data.price,1)
             await sleep(500)
         })
 
@@ -638,6 +640,7 @@ async function triggerOrder(current_price) {
 }
 
 gridEmitter.on("grid_start", async () => { 
+    total_error_count = 0
     await setRangeLimitOrder()
     is_live = true 
     wsConnect()

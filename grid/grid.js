@@ -430,6 +430,7 @@ async function createOrder(bid_type,order_price,size,byDynamic=false){
     } catch (error) {
         //console.log('error : ',error) 
         console.log('error 2 : ',error.response.data || error.message) 
+        console.log('body_param_for_testing___',body_param_for_testing)
 
         // const errData = error?.response?.data || {};
         // const errStatus = error?.response?.status || 'NO_STATUS';

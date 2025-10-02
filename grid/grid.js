@@ -8,7 +8,7 @@ const nodemailer = require('nodemailer')
 
 const EventEmitter = require('events')
 const gridEmitter = new EventEmitter()
-
+ 
 let transporter = nodemailer.createTransport({
   service: 'gmail',
   auth: {

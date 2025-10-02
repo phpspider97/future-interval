@@ -120,7 +120,7 @@ function wsConnect() {
                     ws.close(1000, 'Too many errors');
                 }  
                 if(message.type == "orders"){  
-                    console.log('enter1')
+                    console.log('enter1',message.state,message.meta_data.pnl)
                     if(message.state == 'closed' && message.meta_data.pnl != undefined){  
                         console.log('enter2')
                         console.log('message____',message)
@@ -433,7 +433,7 @@ async function createOrder(bid_type,order_price,size,byDynamic=false){
         } 
          
         const response = await axios.post(`${API_URL}/v2/orders`, bodyParams, { headers })
-        console.log('create order : ',response.data, body_param_for_testing)
+        //console.log('create order : ',response.data, body_param_for_testing)
         if (response.data.success) { 
             number_of_time_order_executed++  
             return { data: response.data, status: true }

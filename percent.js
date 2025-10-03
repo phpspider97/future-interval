@@ -57,10 +57,10 @@ console.log('ORG :',forth_percentage, 'LOT : ',second_value)
 // console.log(sum, sum*85, Math.round(sum*85 - sum*85/3))
 
 // BTC
-let sum = 0; let lot = 2; let added_lot = 2; let count = 0; let sum_lot = 0; let start_price = 110000; let loop_count = 30; let gap = 10
+let sum = 0; let lot = 10; let added_lot = 10; let count = 0; let sum_lot = 0; let start_price = 120000; let loop_count = 10; let gap = 30
 for(let point = start_price; point>=start_price-30000; point-=100*gap){
-    lot = (count < 5)?lot:added_lot; sum += lot*(loop_count-count); sum_lot += lot
-    console.log(count+1,'===>',point,'===>',lot,'===>',sum_lot,'===>',lot*(loop_count-count)); count++
+    lot = (count < 5)?lot:added_lot; sum += lot*(loop_count-count)*(gap/10); sum_lot += lot
+    console.log(count+1,'===>',point,'===>',lot,'===>',sum_lot,'===>',lot*(loop_count-count)*(gap/10)); count++
 }
 console.log(sum, sum*85, Math.round(sum*85 - sum*85/3))
 

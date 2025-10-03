@@ -337,13 +337,13 @@ async function setRangeLimitOrder() {
 
         for (const data of first_five) {
             order_in_progress = false;
-            await createOrder('buy', data.price,4);
+            await createOrder('buy', data.price,1);
             await sleep(500);
         }
         
         for (const data of last_five) {
             order_in_progress = false;
-            await createOrder('sell', data.price,4);
+            await createOrder('sell', data.price,1);
             await sleep(500);
         }
 
@@ -400,9 +400,9 @@ async function createOrder(bid_type,order_price,size,byDynamic=false){
     if(byDynamic){
         console.log('total_error_count___',total_error_count)
     }
-    if(total_error_count>3){
-        return true
-    } 
+    // if(total_error_count>3){
+    //     return true
+    // } 
     if (order_in_progress){ 
         return true
     }

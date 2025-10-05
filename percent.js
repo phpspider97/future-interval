@@ -64,9 +64,9 @@ console.log('ORG :',forth_percentage, 'LOT : ',second_value)
 // }
 // console.log(sum, sum*85, Math.round(sum*85 - sum*85/3))
 
-let sum = 0; let lot_main = 10; let added_lot = 5; let count = 0; let count_new = 1; let sum_lot = 0; let start_price = 120000; let loop_count = 30; let gap = 10
+let sum = 0; let lot_main = 5; let added_lot = 5; let count = 0; let count_new = 1; let sum_lot = 0; let start_price = 123000; let loop_count = 30; let gap = 10
 for(let point = start_price; point>=start_price-30000; point-=100*gap){ count_new++
-    lot = (count_new%2 === 0)?(count_new === 2)?lot_main*2:lot_main:added_lot; sum += lot*(loop_count-count)*(gap/10); sum_lot += lot
+    lot = (count_new%2 === 0)?(count_new === 2)?lot_main*6:lot_main:added_lot; sum += lot*(loop_count-count)*(gap/10); sum_lot += lot
     console.log(count+1,'===>',point,'===>',lot,'===>',sum_lot,'===>',lot*(loop_count-count)*(gap/10)); count++
 }
 console.log(sum, sum*85, Math.round(sum*85 - sum*85/3))
@@ -76,6 +76,10 @@ console.log(sum, sum*85, Math.round(sum*85 - sum*85/3))
 3780
 
 // MAIN        ===>    10K
-// SCALPER     ===>    43.68K
+// SCALPER     ===>    53.68K
 // GRID        ===>    38.03K
 // SUPERTREND  ===>    21.71K
+
+// 181900 ==> 20
+// 207400 ==> 30
+// 232900 ==> 40

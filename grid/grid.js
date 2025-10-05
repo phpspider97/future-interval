@@ -127,8 +127,11 @@ function wsConnect() {
                         const side = message.side
                         const size = message.size
                         const order_at = parseInt(message.limit_price)
-                        //console.log('order_at___',order_at)
                         const update_order_price = (side == 'buy')?order_at+profit_margin:order_at-profit_margin 
+
+
+                        console.log('order_at___',order_at,side,update_order_price)
+                        
                         if(!is_price_out_of_grid && order_at <= upper_price && order_at >= lower_price){  
                             //console.log('size____ : ',size,update_order_price)
                             await createOrder((side == 'buy')?'sell':'buy',update_order_price,size,true)

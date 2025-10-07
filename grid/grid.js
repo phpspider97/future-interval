@@ -455,7 +455,7 @@ async function createOrder(bid_type,order_price,size,byDynamic=false){
         // console.error('Error Msg    : ', errMsg);
 
         //sendEmail(error.message +' '+JSON.stringify(body_param_for_testing),`ERROR IN WHEN CREATING ORDER`) 
-        total_error_count++ 
+        //total_error_count++ 
         order_in_progress = false;  
         return { message: error?.message, status: false }
     } finally {

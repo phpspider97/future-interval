@@ -155,9 +155,9 @@ async function createOrder(bidType) {
     if (!is_live || orderInProgress) return true;
     orderInProgress = true;
     try {
-      sendEmail(`CREATE ORDER ${bidType}`);
-      console.log('bidType : ',bidType)
-      return true
+      //sendEmail(`CREATE ORDER ${bidType}`);
+      // console.log('bidType : ',bidType)
+      // return true
       await cancelAllOpenOrder();
       const timestamp = Math.floor(Date.now() / 1000);
       const trail_amount = (bidType == 'buy')?'-300':'300'
@@ -220,14 +220,15 @@ async function checkSuperTrend() {
     const rsiSignal = rsi > 50 ? 'BUY' : 'SELL';
     let super_trend_signal = signal
     signal = emaSignal
-    //console.log('SUPER TREND:',super_trend_signal, '| EMA:', emaSignal, '| RSI:', rsiSignal);
+    console.log('SUPER TREND:',super_trend_signal, '| EMA:', emaSignal, '| RSI:', rsiSignal);
  
     if (current_order_status !== signal && signal === emaSignal && signal === rsiSignal) {
       current_order_status = signal;
       signal_type = signal;
-      sendEmail(`SUPER TREND CHANGED : ${signal}`, 'Signal Match');
+      //sendEmail(`SUPER TREND CHANGED : ${signal}`, 'Signal Match');
+      //console.log(`SUPER TREND CHANGED : ${signal}`, 'Signal Match')
       //signal = 'buy'
-      await createOrder(signal.toLowerCase());
+      //await createOrder(signal.toLowerCase());
     }
 
     await updateOrderInfo(JSON.stringify({

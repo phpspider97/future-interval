@@ -184,11 +184,11 @@ function wsConnect() {
                     if ( given_price_range && given_price_range.length>0 && (candle_current_price > given_price_range[given_price_range.length-1]?.price+stoploss_both_side || candle_current_price < given_price_range[0]?.price-stoploss_both_side) && !is_price_out_of_grid ) {
                         is_price_out_of_grid = true
 
-                        total_error_count = 0
-                        await cancelAllOpenOrder() 
-                        fs.writeFileSync('./grid/orderInfo.json', '', 'utf8')
-                        sendEmail('',`BOT STOP BECAUSE OUT OF GRID`)
-                        is_live = false 
+                        // total_error_count = 0
+                        // await cancelAllOpenOrder() 
+                        // fs.writeFileSync('./grid/orderInfo.json', '', 'utf8')
+                        // sendEmail('',`BOT STOP BECAUSE OUT OF GRID`)
+                        // is_live = false 
 
                         //sendEmail('',`PRICE OUT OF THE GRID NOW GRID STOP FOR 10 MINUTE`)
                         //await cancelAllOpenOrder()
@@ -208,7 +208,7 @@ function wsConnect() {
         }
     } 
     async function onError(error) {
-        await cancelAllOpenOrder()
+        //await cancelAllOpenOrder()
         sendEmail(error.message??'',`SOCKET DEFAULT ERROR TRIGGERED`)
         setTimeout(() => {
             sendEmail('',`SOCKET RE-CONNECT AGAIN AFTER 2 SECONDS CLOSED DUE TO SOCKET DEFAULT ERROR TRIGGERED`)
@@ -223,7 +223,7 @@ function wsConnect() {
         console.log(`Socket closed with code: ${code}, reason: ${reason}`)
         if(code == 1000){
             sendEmail(reason.toString(),`SOCKET CLOSED DUE TO TOO MANY ERROR`)
-            await cancelAllOpenOrder()
+            //await cancelAllOpenOrder()
             setTimeout(() => {
                 total_error_count = 0 
                 sendEmail('',`SOCKET RE-CONNECT AGAIN AFTER 1 MINUTE CLOSED DUE TO TOO MANY ERROR`)
@@ -299,7 +299,7 @@ function sleep(ms) {
  
 async function setRangeLimitOrder() {
     try {
-        await cancelAllOpenOrder()
+        //await cancelAllOpenOrder()
         const response = await axios.get(`${API_URL}/v2/tickers/BTCUSD`);
         const current_price = Math.round(response?.data?.result?.close);  
         bitcoin_product_id = response.data.result.product_id;
@@ -339,13 +339,13 @@ async function setRangeLimitOrder() {
 
         for (const data of first_five) {
             order_in_progress = false;
-            await createOrder('buy', data.price,4);
+            await createOrder('buy', data.price,3);
             await sleep(500);
         }
         
         for (const data of last_five) {
             order_in_progress = false;
-            await createOrder('sell', data.price,4);
+            await createOrder('sell', data.price,3);
             await sleep(500);
         }
 

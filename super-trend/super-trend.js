@@ -154,10 +154,10 @@ function sendEmail(message, subject) {
 async function createOrder(bidType) {
     if (!is_live || orderInProgress) return true;
     orderInProgress = true;
-    sendEmail(`CREATE ORDER ${bidType}`);
-    console.log('bidType : ',bidType)
-    return true
     try {
+      sendEmail(`CREATE ORDER ${bidType}`);
+      console.log('bidType : ',bidType)
+      return true
       await cancelAllOpenOrder();
       const timestamp = Math.floor(Date.now() / 1000);
       const trail_amount = (bidType == 'buy')?'-300':'300'

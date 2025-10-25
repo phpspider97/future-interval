@@ -220,13 +220,13 @@ async function checkSuperTrend() {
     const rsiSignal = rsi > 50 ? 'BUY' : 'SELL';
     let super_trend_signal = signal
     signal = emaSignal
-    console.log('SUPER TREND:',super_trend_signal, '| EMA:', emaSignal, '| RSI:', rsiSignal);
+    //console.log('SUPER TREND:',super_trend_signal, '| EMA:', emaSignal, '| RSI:', rsiSignal);
  
     if (current_order_status !== signal && signal === emaSignal && signal === rsiSignal) {
       current_order_status = signal;
       signal_type = signal;
       //sendEmail(`SUPER TREND CHANGED : ${signal}`, 'Signal Match');
-      //console.log(`SUPER TREND CHANGED : ${signal}`, 'Signal Match')
+      console.log(`SUPER TREND CHANGED : ${signal}`, 'Signal Match')
       //signal = 'buy'
       //await createOrder(signal.toLowerCase());
     }

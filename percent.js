@@ -78,6 +78,12 @@ for(let point = start_price; point>=start_price-50000; point-=100*gap){ count_ne
 }
 console.log('$ :',sum, 'RS :',sum*85, 'Discount :',Math.round(sum*85 - sum*85/3))
 
+// let sum = 0; let lot_main = 50; let added_lot = 5; let count = 0; let count_new = 1; let particular_loss = 0; let sum_lot = 0; let start_price = 4000; let loop_count = 30; let gap = 1
+// for(let point = start_price; point>=start_price-3000; point-=100*gap){ count_new++
+//     lot = (count === 0 || count%5 === 0)?(count === 0)?50:lot_main:added_lot; sum += lot*(loop_count-count)*(gap); particular_loss += sum_lot*85*gap; sum_lot += lot;
+//     console.log(count+1,'===>',point,'===>',lot,'===>',sum_lot,'===>',lot*(loop_count-count)*(gap), '====>', particular_loss); count++
+// }
+// console.log('$ :',sum, 'RS :',sum*85, 'Discount :',Math.round(sum*85 - sum*85/3))
 
 let message = 137.09;
 console.log((message + message*0.015).toFixed(2));

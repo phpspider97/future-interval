@@ -151,7 +151,7 @@ function sendEmail(message, subject) {
   });
 }
 
-async function createOrder(bidType) {
+async function createOrder(bidType,bitcoin_current_price) {
     if (!is_live || orderInProgress) return true;
     orderInProgress = true;
     try {
@@ -161,14 +161,20 @@ async function createOrder(bidType) {
       await cancelAllOpenOrder();
       const timestamp = Math.floor(Date.now() / 1000);
       const trail_amount = (bidType == 'buy')?'-300':'300'
+      const take_profit_amount = (bidType == 'buy')?bitcoin_current_price+300:bitcoin_current_price-300
+      const stop_loss_amount = (bidType == 'buy')?bitcoin_current_price-200:bitcoin_current_price+200
       const bodyParams = {
         product_id: bitcoin_product_id,
         product_symbol: SYMBOL,
         size: ORDER_SIZE,
         side: bidType,
         order_type: "market_order",
-        trail_amount:trail_amount,
-        bracket_trail_amount:trail_amount
+        //trail_amount:trail_amount,
+        //bracket_trail_amount:trail_amount,
+        bracket_take_profit_limit_price: take_profit_amount,
+        bracket_take_profit_price: take_profit_amount,
+        bracket_stop_loss_limit_price: stop_loss_amount,
+        bracket_stop_loss_price: stop_loss_amount,
       };
       const signaturePayload = `POST${timestamp}/v2/orders${JSON.stringify(bodyParams)}`;
       const signature = await generateEncryptSignature(signaturePayload);
@@ -228,7 +234,7 @@ async function checkSuperTrend() {
       sendEmail(`SUPER TREND CHANGED : ${signal}`, 'Signal Match');
       console.log(`SUPER TREND CHANGED : ${signal}`, 'Signal Match')
       //signal = 'buy'
-      await createOrder(signal.toLowerCase());
+      await createOrder(signal.toLowerCase(),bitcoin_current_price);
     }
 
     await updateOrderInfo(JSON.stringify({

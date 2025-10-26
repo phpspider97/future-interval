@@ -218,7 +218,7 @@ async function checkSuperTrend() {
 
     const emaSignal = ema9 > ema21 ? 'BUY' : 'SELL';
     const rsiSignal = rsi > 50 ? 'BUY' : 'SELL';
-    let super_trend_signal = signal
+    let super_trend_signal = signal 
     signal = emaSignal
     //console.log('SUPER TREND:',super_trend_signal, '| EMA:', emaSignal, '| RSI:', rsiSignal);
  

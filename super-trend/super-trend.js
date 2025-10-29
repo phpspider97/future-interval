@@ -169,13 +169,14 @@ async function createOrder(bidType,bitcoin_current_price) {
         size: ORDER_SIZE,
         side: bidType,
         order_type: "market_order",
-        //trail_amount:trail_amount,
-        //bracket_trail_amount:trail_amount,
-        bracket_take_profit_limit_price: take_profit_amount,
-        bracket_take_profit_price: take_profit_amount,
-        bracket_stop_loss_limit_price: stop_loss_amount,
-        bracket_stop_loss_price: stop_loss_amount,
+        trail_amount:trail_amount,
+        bracket_trail_amount:trail_amount,
+        //bracket_take_profit_limit_price: take_profit_amount,
+        //bracket_take_profit_price: take_profit_amount,
+        //bracket_stop_loss_limit_price: stop_loss_amount,
+        //bracket_stop_loss_price: stop_loss_amount,
       };
+      //console.log(bodyParams)
       const signaturePayload = `POST${timestamp}/v2/orders${JSON.stringify(bodyParams)}`;
       const signature = await generateEncryptSignature(signaturePayload);
       const headers = {

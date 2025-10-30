@@ -13,7 +13,7 @@ const superTrendEmitter = new EventEmitter();
 const key = process.env.SUPER_TREND_WEB_KEY;
 const secret = process.env.SUPER_TREND_WEB_SECRET;
 const api_url = process.env.API_URL;
-const ORDER_SIZE = parseFloat(process.env.ORDER_SIZE || 1);
+const ORDER_SIZE = parseFloat(process.env.ORDER_SIZE || 2);
 
 //console.log(key,' === ',secret)
 
@@ -161,20 +161,21 @@ async function createOrder(bidType,bitcoin_current_price) {
       await cancelAllOpenOrder();
       const timestamp = Math.floor(Date.now() / 1000);
       const trail_amount = (bidType == 'buy')?'-300':'300'
-      const take_profit_amount = (bidType == 'buy')?bitcoin_current_price+300:bitcoin_current_price-300
+      const take_profit_amount = (bidType == 'buy')?bitcoin_current_price+350:bitcoin_current_price-350
       const stop_loss_amount = (bidType == 'buy')?bitcoin_current_price-200:bitcoin_current_price+200
+      
       const bodyParams = {
         product_id: bitcoin_product_id,
         product_symbol: SYMBOL,
         size: ORDER_SIZE,
         side: bidType,
         order_type: "market_order",
-        trail_amount:trail_amount,
-        bracket_trail_amount:trail_amount,
-        //bracket_take_profit_limit_price: take_profit_amount,
-        //bracket_take_profit_price: take_profit_amount,
-        //bracket_stop_loss_limit_price: stop_loss_amount,
-        //bracket_stop_loss_price: stop_loss_amount,
+        //trail_amount:trail_amount,
+        //bracket_trail_amount:trail_amount,
+        bracket_take_profit_limit_price: take_profit_amount,
+        bracket_take_profit_price: take_profit_amount,
+        bracket_stop_loss_limit_price: stop_loss_amount,
+        bracket_stop_loss_price: stop_loss_amount,
       };
       //console.log(bodyParams)
       const signaturePayload = `POST${timestamp}/v2/orders${JSON.stringify(bodyParams)}`;

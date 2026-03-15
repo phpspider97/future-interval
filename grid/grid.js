@@ -321,7 +321,7 @@ async function setRangeLimitOrder() {
   
         const first_five = given_price_range.slice(1, 17)
         const last_five = given_price_range.slice(-16)
-
+ 
         // console.log('current_price___',current_price)
         // console.log('first_five___',first_five)
         // console.log('last_five___',last_five)

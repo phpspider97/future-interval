@@ -88,6 +88,26 @@ console.log('$ :',sum, 'RS :',sum*85, 'Discount :',Math.round(sum*85 - sum*85/3)
 let message = 137.09;
 console.log((message + message*0.015).toFixed(2));
 
+let current = 2900
+let time    = 10
+let update_price = current
+let rest_lot = 400
+//600pts ==> 600 lot expire 1 month approx
+console.log('CURRENT PRICE ===>',current,' / GAP ===>',1000/time,'/ LOT ===>',rest_lot/time)
+
+for(let i = 1; i <= time; i++){
+    update_price = update_price-(1000/time)
+    if(i===10){
+      console.log(i,') ->','PRICE :',update_price, '______________ LOT :',rest_lot/time) 
+    }else{
+      console.log(i,')  ->','PRICE :',update_price, '______________ LOT :',rest_lot/time)
+    }
+    if(i===5){
+      console.log('++++++++++++++++++++++++++++++++++++++++++++++++++++')
+      //300pts ==> 300 lot expire 1 month approx
+    }
+}
+
 // 4820
 // 3780
 
@@ -104,3 +124,8 @@ console.log((message + message*0.015).toFixed(2));
 // DCA         : 1L  ==>  2K
 // GRIDS       : 20K ==>  800
 // STRADDLE    : 40K ==>  2K
+
+// TREND       : 10.90
+// DCA         : 54.74
+// GRIDS       : 23
+// STRADDLE    : 46

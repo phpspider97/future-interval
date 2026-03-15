@@ -339,13 +339,13 @@ async function setRangeLimitOrder() {
 
         for (const data of first_five) {
             order_in_progress = false;
-            await createOrder('buy', data.price,3);
+            await createOrder('buy', data.price,2);
             await sleep(500);
         }
         
         for (const data of last_five) {
             order_in_progress = false;
-            await createOrder('sell', data.price,3);
+            await createOrder('sell', data.price,2);
             await sleep(500);
         }
 

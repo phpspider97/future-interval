@@ -317,7 +317,7 @@ async function setRangeLimitOrder() {
                     sell : false
                 }
             }); 
-        }
+        } 
         //console.log('given_price_range___',given_price_range)
         const first_five = given_price_range.slice(1, 25)
         const last_five = given_price_range.slice(-25)

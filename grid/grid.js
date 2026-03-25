@@ -320,7 +320,7 @@ async function setRangeLimitOrder() {
         } 
         //console.log('given_price_range___',given_price_range)
         const first_five = given_price_range.slice(1, 100)
-        const last_five = given_price_range.slice(-100)
+        const last_five = given_price_range.slice(-200)
  
         // console.log('current_price___',current_price)
         // console.log('first_five___',first_five)

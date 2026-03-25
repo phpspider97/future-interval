@@ -60,8 +60,8 @@ let given_price_range               =   []
 let lower_price                     =   0 
 let upper_price                     =   0 
 let grid_spacing                    =   0
-let numberOfGrids                   =   200
-let profit_margin                   =   10
+let numberOfGrids                   =   100
+let profit_margin                   =   20
 let stoploss_both_side              =   0
 let total_error_count               =   0 
 let number_of_time_order_executed   =   0
@@ -319,8 +319,8 @@ async function setRangeLimitOrder() {
             }); 
         } 
         //console.log('given_price_range___',given_price_range)
-        const first_five = given_price_range.slice(1, 100)
-        const last_five = given_price_range.slice(-200)
+        const first_five = given_price_range.slice(1, 50)
+        const last_five = given_price_range.slice(-50)
  
         // console.log('current_price___',current_price)
         // console.log('first_five___',first_five)
@@ -339,13 +339,13 @@ async function setRangeLimitOrder() {
 
         for (const data of first_five) {
             order_in_progress = false;
-            await createOrder('buy', data.price,5);
+            await createOrder('buy', data.price,10);
             await sleep(500);
         }
         
         for (const data of last_five) {
             order_in_progress = false;
-            await createOrder('sell', data.price,5);
+            await createOrder('sell', data.price,10);
             await sleep(500);
         }
 

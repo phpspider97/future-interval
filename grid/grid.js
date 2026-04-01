@@ -307,7 +307,7 @@ async function setRangeLimitOrder() {
         upper_price       =  round_of_current_price + 30
         lower_price       =  round_of_current_price - 30
         grid_spacing      =  (upper_price - lower_price) / numberOfGrids;
-        console.log('response___',response) 
+        //console.log('response___',response) 
         for (let i = 0; i < numberOfGrids; i++) {
             const rawBuyPrice = lower_price + i * grid_spacing
             given_price_range.push({
@@ -318,7 +318,7 @@ async function setRangeLimitOrder() {
                 }
             }); 
         } 
-        console.log('given_price_range___',given_price_range)
+        //console.log('given_price_range___',given_price_range)
         const first_five = given_price_range.slice(1, 30)
         const last_five = given_price_range.slice(-30)
  
@@ -339,6 +339,8 @@ async function setRangeLimitOrder() {
 
         for (const data of first_five) {
             order_in_progress = false;
+
+            console.log('buy_data___',data)
             await createOrder('buy', data.price,5);
             await sleep(500);
         }
@@ -399,14 +401,14 @@ async function generateEncryptSignature(signaturePayload) {
     return crypto.createHmac("sha256", SECRET).update(signaturePayload).digest("hex");
 }
 async function createOrder(bid_type,order_price,size,byDynamic=false){
-    console.log({
-        product_id : bitcoin_product_id,
-        product_symbol : "SLVONUSD",
-        size : size, 
-        side : bid_type,   
-        order_type : "limit_order",
-        limit_price : order_price
-    } )
+    // console.log({
+    //     product_id : bitcoin_product_id,
+    //     product_symbol : "SLVONUSD",
+    //     size : size, 
+    //     side : bid_type,   
+    //     order_type : "limit_order",
+    //     limit_price : order_price
+    // } )
     return true
     if(byDynamic){
         console.log('total_error_count___',total_error_count)

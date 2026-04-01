@@ -9,7 +9,7 @@ const { gridEmitter } = require("./grid/grid");
 // const { ggridEmitter } = require("./grid/g-grid"); 
 // const { crossEmitter } = require("./cross/cross"); 
 // const { strangleOptionEmitter } = require("./strangle/strangle"); 
-const { superTrendEmitter } = require("./super-trend/super-trend"); 
+//const { superTrendEmitter } = require("./super-trend/super-trend"); 
  
 const app = express();
 const server = http.createServer(app);
@@ -71,13 +71,13 @@ app.get('/', (req, res) => {
 //==============================CROSS==================================
 
 //==============================SUPER TREND==================================
-superTrendEmitter.on("super_trend_trade_info", (data) => {  
-    //console.log('data__',data)
-    io.emit("super_trend_trade_info", data)
-})  
-app.get('/super-trend', (req, res) => {  
-    res.sendFile(path.join(__dirname, 'public', 'super-trend.html'));
-}) 
+// superTrendEmitter.on("super_trend_trade_info", (data) => {  
+//     //console.log('data__',data)
+//     io.emit("super_trend_trade_info", data)
+// })  
+// app.get('/super-trend', (req, res) => {  
+//     res.sendFile(path.join(__dirname, 'public', 'super-trend.html'));
+// }) 
 //==============================SUPER TREND==================================
 
 //==============================STRANGLE==================================
@@ -110,12 +110,12 @@ io.on("connection", (socket) => {
         gridEmitter.emit("grid_stop")
     })
 
-    socket.on("super_trend_start", () => { 
-        superTrendEmitter.emit("super_trend_start")
-    })
-    socket.on("super_trend_stop", () => { 
-        superTrendEmitter.emit("super_trend_stop")
-    })
+    // socket.on("super_trend_start", () => { 
+    //     superTrendEmitter.emit("super_trend_start")
+    // })
+    // socket.on("super_trend_stop", () => { 
+    //     superTrendEmitter.emit("super_trend_stop")
+    // })
     // socket.on("v_grid_start", () => { 
     //     vgridEmitter.emit("v_grid_start")
     // })

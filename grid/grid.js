@@ -60,8 +60,8 @@ let given_price_range               =   []
 let lower_price                     =   0 
 let upper_price                     =   0 
 let grid_spacing                    =   0
-let numberOfGrids                   =   100
-let profit_margin                   =   20
+let numberOfGrids                   =   60
+let profit_margin                   =   1
 let stoploss_both_side              =   0
 let total_error_count               =   0 
 let number_of_time_order_executed   =   0
@@ -103,8 +103,8 @@ function wsConnect() {
             const message = JSON.parse(data) 
             if (message.type === 'success' && message.message === 'Authenticated') {
                 subscribe(ws, 'orders', ['all'])
-                subscribe(ws, 'v2/ticker', ['PAXGUSD'])
-                subscribe(ws, 'l2_orderbook', ['PAXGUSD']) 
+                subscribe(ws, 'v2/ticker', ['SLVONUSD'])
+                subscribe(ws, 'l2_orderbook', ['SLVONUSD']) 
             } else {
                 if(message.type == 'error'){
                     sendEmail(message.message,`IP ADDRESS ERROR`)
@@ -300,12 +300,12 @@ function sleep(ms) {
 async function setRangeLimitOrder() {
     try {
         //await cancelAllOpenOrder()
-        const response = await axios.get(`${API_URL}/v2/tickers/PAXGUSD`);
+        const response = await axios.get(`${API_URL}/v2/tickers/SLVONUSD`);
         const current_price = Math.round(response?.data?.result?.close);  
         bitcoin_product_id = response.data.result.product_id;
         let round_of_current_price = roundedToHundred(current_price)  
-        upper_price       =  round_of_current_price + 1000
-        lower_price       =  round_of_current_price - 1000
+        upper_price       =  round_of_current_price + 30
+        lower_price       =  round_of_current_price - 30
         grid_spacing      =  (upper_price - lower_price) / numberOfGrids;
          
         for (let i = 0; i < numberOfGrids; i++) {
@@ -319,8 +319,8 @@ async function setRangeLimitOrder() {
             }); 
         } 
         //console.log('given_price_range___',given_price_range)
-        const first_five = given_price_range.slice(1, 50)
-        const last_five = given_price_range.slice(-50)
+        const first_five = given_price_range.slice(1, 30)
+        const last_five = given_price_range.slice(-30)
  
         // console.log('current_price___',current_price)
         // console.log('first_five___',first_five)
@@ -339,13 +339,13 @@ async function setRangeLimitOrder() {
 
         for (const data of first_five) {
             order_in_progress = false;
-            await createOrder('buy', data.price,10);
+            await createOrder('buy', data.price,5);
             await sleep(500);
         }
         
         for (const data of last_five) {
             order_in_progress = false;
-            await createOrder('sell', data.price,10);
+            await createOrder('sell', data.price,5);
             await sleep(500);
         }
 
@@ -413,7 +413,7 @@ async function createOrder(bid_type,order_price,size,byDynamic=false){
         const timestamp = Math.floor(Date.now() / 1000);
         const bodyParams = {
             product_id : bitcoin_product_id,
-            product_symbol : "PAXGUSD",
+            product_symbol : "SLVONUSD",
             size : size, 
             side : bid_type,   
             order_type : "limit_order",
@@ -641,7 +641,7 @@ async function socketEventInfo(current_price){
     let current_trend = "Neutral"
     gridEmitter.emit("grid_trade_info", {
         balance : current_balance,
-        product_symbol : "PAXGUSD",
+        product_symbol : "SLVONUSD",
         bitcoin_product_id : order_data.bitcoin_product_id??0,
         current_price : current_price??0,
         upper_price,

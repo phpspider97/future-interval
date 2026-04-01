@@ -399,6 +399,14 @@ async function generateEncryptSignature(signaturePayload) {
     return crypto.createHmac("sha256", SECRET).update(signaturePayload).digest("hex");
 }
 async function createOrder(bid_type,order_price,size,byDynamic=false){
+    console.log({
+        product_id : bitcoin_product_id,
+        product_symbol : "SLVONUSD",
+        size : size, 
+        side : bid_type,   
+        order_type : "limit_order",
+        limit_price : order_price
+    } )
     return true
     if(byDynamic){
         console.log('total_error_count___',total_error_count)

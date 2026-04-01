@@ -61,7 +61,7 @@ let lower_price                     =   0
 let upper_price                     =   0 
 let grid_spacing                    =   0
 let numberOfGrids                   =   60
-let profit_margin                   =   5
+let profit_margin                   =   1
 let stoploss_both_side              =   0
 let total_error_count               =   0 
 let number_of_time_order_executed   =   0
@@ -307,7 +307,7 @@ async function setRangeLimitOrder() {
         upper_price       =  round_of_current_price + 30
         lower_price       =  round_of_current_price - 30
         grid_spacing      =  (upper_price - lower_price) / numberOfGrids;
-         
+        console.log('response___',response) 
         for (let i = 0; i < numberOfGrids; i++) {
             const rawBuyPrice = lower_price + i * grid_spacing
             given_price_range.push({
@@ -339,13 +339,13 @@ async function setRangeLimitOrder() {
 
         for (const data of first_five) {
             order_in_progress = false;
-            await createOrder('buy', data.price,1);
+            await createOrder('buy', data.price,5);
             await sleep(500);
         }
         
         for (const data of last_five) {
             order_in_progress = false;
-            await createOrder('sell', data.price,1);
+            await createOrder('sell', data.price,5);
             await sleep(500);
         }
 
@@ -399,6 +399,7 @@ async function generateEncryptSignature(signaturePayload) {
     return crypto.createHmac("sha256", SECRET).update(signaturePayload).digest("hex");
 }
 async function createOrder(bid_type,order_price,size,byDynamic=false){
+    return true
     if(byDynamic){
         console.log('total_error_count___',total_error_count)
     }

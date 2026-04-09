@@ -60,7 +60,7 @@ let given_price_range               =   []
 let lower_price                     =   0 
 let upper_price                     =   0 
 let grid_spacing                    =   0
-let numberOfGrids                   =   120
+let numberOfGrids                   =   100
 let profit_margin                   =   0.5
 let stoploss_both_side              =   0
 let total_error_count               =   0 
@@ -306,8 +306,8 @@ async function setRangeLimitOrder() {
         //let round_of_current_price = roundedToHundred(current_price)  
         let round_of_current_price =  Math.round(current_price)  
        
-        upper_price       =  round_of_current_price + 30
-        lower_price       =  round_of_current_price - 30
+        upper_price       =  round_of_current_price + 25
+        lower_price       =  round_of_current_price - 25
         grid_spacing      =  (upper_price - lower_price) / numberOfGrids ;
         //console.log('response___',response) 
         for (let i = 0; i < numberOfGrids; i++) {
@@ -322,8 +322,8 @@ async function setRangeLimitOrder() {
         } 
         console.log('given_price_range____',numberOfGrids, grid_spacing, JSON.stringify(given_price_range))
         //console.log('given_price_range___', round_of_current_price, upper_price, lower_price, grid_spacing)
-        const first_five = given_price_range.slice(1, 60)
-        const last_five = given_price_range.slice(-60)
+        const first_five = given_price_range.slice(1, 50)
+        const last_five = given_price_range.slice(-50)
  
         // console.log('current_price___',current_price)
         // console.log('first_five___',first_five)

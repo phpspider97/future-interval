@@ -126,7 +126,8 @@ function wsConnect() {
                         //console.log('message____',message)
                         const side = message.side
                         const size = message.size
-                        const order_at = parseInt(message.limit_price)
+                        //const order_at = parseInt(message.limit_price)
+                        const order_at = message.limit_price
                         const update_order_price = (side == 'buy')?order_at+profit_margin:order_at-profit_margin 
 
                         console.log('order_at___',order_at,side,update_order_price,is_price_out_of_grid,upper_price,lower_price)

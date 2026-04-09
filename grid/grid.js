@@ -322,8 +322,8 @@ async function setRangeLimitOrder() {
         } 
         console.log('given_price_range____',numberOfGrids, grid_spacing, JSON.stringify(given_price_range))
         //console.log('given_price_range___', round_of_current_price, upper_price, lower_price, grid_spacing)
-        const first_five = given_price_range.slice(1, 30)
-        const last_five = given_price_range.slice(-30)
+        const first_five = given_price_range.slice(1, 60)
+        const last_five = given_price_range.slice(-60)
  
         // console.log('current_price___',current_price)
         // console.log('first_five___',first_five)

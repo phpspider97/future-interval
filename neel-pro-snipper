@@ -1,0 +1,119 @@
+//@version=6
+indicator("BTC Algo PRO v6 (Multi TP)", overlay=true, max_boxes_count=300)
+
+// ================= INPUTS =================
+emaFastLen = input.int(9)
+emaMidLen  = input.int(21)
+emaSlowLen = input.int(200)
+
+slopeLookback = input.int(5)
+slopeThreshold = input.float(0.10) / 100
+
+atrLen = input.int(14)
+atrSLmult = input.float(1.5)
+
+// TP multipliers
+tp1_mult = input.float(1.0, "TP1 (ATR)")
+tp2_mult = input.float(2.0, "TP2 (ATR)")
+
+// ================= INDICATORS =================
+ema9   = ta.ema(close, emaFastLen)
+ema21  = ta.ema(close, emaMidLen)
+ema200 = ta.ema(close, emaSlowLen)
+atr    = ta.atr(atrLen)
+
+// ================= LOGIC =================
+emaPrev = ema9[slopeLookback]
+slope = (ema9 - emaPrev) / emaPrev
+
+upTrend   = ema9 > ema21 and ema21 > ema200
+downTrend = ema9 < ema21 and ema21 < ema200
+
+pullbackBuy  = close <= ema9 * 1.002
+pullbackSell = close >= ema9 * 0.998
+
+rawBuy  = upTrend and pullbackBuy and slope > slopeThreshold and close > ema9
+rawSell = downTrend and pullbackSell and slope < -slopeThreshold and close < ema9
+
+// ================= STATE =================
+var int lastSignal = 0
+buyCond  = rawBuy  and lastSignal != 1
+sellCond = rawSell and lastSignal != -1
+
+if buyCond
+    lastSignal := 1
+else if sellCond
+    lastSignal := -1
+
+// ================= TRADE DATA =================
+var float entry = na
+var float sl = na
+var float tp1 = na
+var float tp2 = na
+var float runnerTP = na
+
+// ================= BOXES =================
+var box riskBox = na
+var box tp1Box = na
+var box tp2Box = na
+
+// ================= BUY =================
+if buyCond
+    entry := close
+    sl := close - atr * atrSLmult
+    tp1 := close + atr * tp1_mult
+    tp2 := close + atr * tp2_mult
+    runnerTP := tp2
+
+    riskBox := box.new(bar_index, entry, bar_index, sl, bgcolor=color.new(color.red,85))
+    tp1Box  := box.new(bar_index, tp1, bar_index, entry, bgcolor=color.new(color.green,80))
+    tp2Box  := box.new(bar_index, tp2, bar_index, tp1, bgcolor=color.new(color.green,60))
+
+// ================= SELL =================
+if sellCond
+    entry := close
+    sl := close + atr * atrSLmult
+    tp1 := close - atr * tp1_mult
+    tp2 := close - atr * tp2_mult
+    runnerTP := tp2
+
+    riskBox := box.new(bar_index, sl, bar_index, entry, bgcolor=color.new(color.red,85))
+    tp1Box  := box.new(bar_index, entry, bar_index, tp1, bgcolor=color.new(color.green,80))
+    tp2Box  := box.new(bar_index, tp1, bar_index, tp2, bgcolor=color.new(color.green,60))
+
+// ================= DYNAMIC RUNNER =================
+if not na(entry)
+    if lastSignal == 1
+        runnerTP := math.max(runnerTP, ema9)
+
+        box.set_right(riskBox, bar_index)
+        box.set_right(tp1Box, bar_index)
+        box.set_right(tp2Box, bar_index)
+
+        box.set_top(tp2Box, runnerTP)
+
+    if lastSignal == -1
+        runnerTP := math.min(runnerTP, ema9)
+
+        box.set_right(riskBox, bar_index)
+        box.set_right(tp1Box, bar_index)
+        box.set_right(tp2Box, bar_index)
+
+        box.set_bottom(tp2Box, runnerTP)
+
+// ================= SIGNALS =================
+plotshape(buyCond, location=location.belowbar, color=color.green, style=shape.labelup, text="BUY")
+plotshape(sellCond, location=location.abovebar, color=color.red, style=shape.labeldown, text="SELL")
+
+// ================= ALERTS =================
+alertcondition(buyCond, "BUY", "BUY SIGNAL")
+alertcondition(sellCond, "SELL", "SELL SIGNAL")
+
+alertcondition(close >= tp1, "TP1 HIT", "TP1 reached")
+alertcondition(close >= tp2, "TP2 HIT", "TP2 reached")
+
+
+
+8207158816:AAGT9_o7j5O7rGnyh0sHmQPIL1m_io3g7dU
+
+6745849469

@@ -97,7 +97,6 @@ async function run() {
 }
 
 // RUN LOOP
-console.log("🤖 High Win Rate Delta Bot Running...");
 setInterval(run, 60 * 1000); // every 1 min
 
 
@@ -113,4 +112,5 @@ async function sendTelegram(message) {
     } catch (err) {
         console.error("Telegram Error:", err.message);
     }
-} 
+}
+//sendTelegram('Hi')

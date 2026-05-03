@@ -61,17 +61,17 @@ async function run() {
     // SIGNALS
     const buySignal = upTrend && pullbackBuy && slope > slopeThreshold && price > e9 && lastSignal !== 1;
     const sellSignal = downTrend && pullbackSell && slope < -slopeThreshold && price < e9 && lastSignal !== -1;
-    console.table([
-        {
-            upTrend,
-            downTrend, 
-            slope,
-            slopeThreshold,
-            price,
-            e9,
-            lastSignal,
-        }
-    ]);
+    // console.table([
+    //     {
+    //         upTrend,
+    //         downTrend, 
+    //         slope,
+    //         slopeThreshold,
+    //         price,
+    //         e9,
+    //         lastSignal,
+    //     }
+    // ]);
     if (buySignal) {
         lastSignal = 1;
 

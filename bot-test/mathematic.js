@@ -53,7 +53,7 @@ async function run() {
         if (z > 2 && trendSlope < 0) side = "sell";
 
         if (!side) {
-            console.log("No trade | z:", z.toFixed(2), "| slope:", trendSlope.toFixed(4));
+            //console.log("No trade | z:", z.toFixed(2), "| slope:", trendSlope.toFixed(4));
             return;
         }
 

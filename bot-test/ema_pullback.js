@@ -100,7 +100,8 @@ async function run() {
 
         ━━━━━━━━━━━━━━━
         📊 *Strategy:* EMA Pullback
-        ⏱ *Time:* ${new Date().toLocaleTimeString()}
+        
+        🕒 *Time* : ${new Date().toLocaleString("en-IN", { timeZone: "Asia/Kolkata" })}
         `);
         //console.log({ price, sl, tp1, tp2 });
 
@@ -135,7 +136,8 @@ async function run() {
 
         ━━━━━━━━━━━━━━━
         📊 *Strategy:* EMA Pullback
-        ⏱ *Time:* ${new Date().toLocaleTimeString()}
+        
+        🕒 *Time* : ${new Date().toLocaleString("en-IN", { timeZone: "Asia/Kolkata" })}
         `);
         //console.log({ price, sl, tp1, tp2 });
     }

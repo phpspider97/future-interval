@@ -196,7 +196,7 @@ async function run() {
 📦 Volume: ${result.lastVolume}
 📊 Vol MA: ${result.lastVolMA}
 
-⏱ *Time:* ${new Date().toLocaleTimeString()}
+🕒 *Time* : ${new Date().toLocaleString("en-IN", { timeZone: "Asia/Kolkata" })}
 `;
 
       console.log(msg);

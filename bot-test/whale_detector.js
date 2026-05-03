@@ -119,7 +119,7 @@ async function run() {
             📡 *Signal Type:* ${result.strength > 70 ? "🚀 STRONG" : "⚠️ MODERATE"}
             ━━━━━━━━━━━━━━━━━━━
 
-            ⏱ *Time:* ${new Date().toLocaleTimeString()}
+            🕒 *Time* : ${new Date().toLocaleString("en-IN", { timeZone: "Asia/Kolkata" })}
             `);
 
             }

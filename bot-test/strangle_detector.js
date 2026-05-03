@@ -138,7 +138,7 @@ async function tryEnter() {
     const today = now.toDateString();
 
     if (hasEnteredToday && lastTradeDate === today) return;
-    if (!inTimeRange(22, 0, 23, 15)) return;
+    if (!inTimeRange(0, 1, 0, 55)) return;
 
     console.log("🔵 ENTRY CHECK");
 

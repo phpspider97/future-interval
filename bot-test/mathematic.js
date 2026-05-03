@@ -111,6 +111,8 @@ async function run() {
 
             ━━━━━━━━━━━━━━━━━━━
             ⚡ *Strategy:* Mean Reversion + Trend Confirmation
+
+            🕒 *Time* : ${new Date().toLocaleString("en-IN", { timeZone: "Asia/Kolkata" })}
             `)
         }else{
             // sendTelegram(`🔴  MATEMATIC BOT : SELL BTC
@@ -142,7 +144,7 @@ async function run() {
             ━━━━━━━━━━━━━━━━━━━
             ⚡ *Strategy:* Mean Reversion + Trend Confirmation
 
-            ⏱ *Time:* ${new Date().toLocaleTimeString()}
+            🕒 *Time* : ${new Date().toLocaleString("en-IN", { timeZone: "Asia/Kolkata" })}
             `)
         }
 

@@ -106,10 +106,10 @@ async function selectStrikes(options) {
     // 2️⃣ Fallback → premium
     if (!call || !put) {
         console.log("⚠️ Using premium fallback (40–60)");
-
+        //console.log(calls)
         for (let c of calls) {
             const price = await getMark(c.symbol);
-            if (price >= 20 && price <= 30) {
+            if (price >= 40 && price <= 60) {
                 call = c;
                 break;
             }
@@ -117,7 +117,7 @@ async function selectStrikes(options) {
 
         for (let p of puts) {
             const price = await getMark(p.symbol);
-            if (price >= 20 && price <= 30) {
+            if (price >= 40 && price <= 60) {
                 put = p;
                 break;
             }
@@ -145,7 +145,8 @@ async function tryEnter() {
     const options = await getOptions();
 
     const tomorrow = new Date(now);
-    tomorrow.setDate(tomorrow.getDate() + 1);
+    //tomorrow.setDate(tomorrow.getDate() + 1);
+    tomorrow.setDate(tomorrow.getDate());
 
     const nextExpiry = options.filter(o =>
         new Date(o.expiry).toDateString() === tomorrow.toDateString()
@@ -302,5 +303,5 @@ async function run() {
 }
 
 // 🔁 START BOT
-//setInterval(run, INTERVAL);
-module.exports = { run };
+setInterval(run, INTERVAL);
+//module.exports = { run };

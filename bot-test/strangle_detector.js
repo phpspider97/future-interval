@@ -303,5 +303,5 @@ async function run() {
 }
 
 // 🔁 START BOT
-setInterval(run, INTERVAL);
-//module.exports = { run };
+//setInterval(run, INTERVAL);
+module.exports = { run };

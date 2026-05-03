@@ -109,7 +109,7 @@ async function selectStrikes(options) {
 
         for (let c of calls) {
             const price = await getMark(c.symbol);
-            if (price >= 40 && price <= 60) {
+            if (price >= 20 && price <= 30) {
                 call = c;
                 break;
             }
@@ -117,7 +117,7 @@ async function selectStrikes(options) {
 
         for (let p of puts) {
             const price = await getMark(p.symbol);
-            if (price >= 40 && price <= 60) {
+            if (price >= 20 && price <= 30) {
                 put = p;
                 break;
             }

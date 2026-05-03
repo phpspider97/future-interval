@@ -1,109 +1,154 @@
-require('dotenv').config();
-const axios = require('axios');
-const { ATR } = require('technicalindicators');
+require("ccxt");
 
-// ========== Supertrend Calculation ==========
-function calculateSupertrend(candles, period = 10, multiplier = 3) {
-    const high = candles.map(c => c.high);
-    const low = candles.map(c => c.low);
-    const close = candles.map(c => c.close);
-    const atr = ATR.calculate({ high, low, close, period });
+const ccxt = require("ccxt");
+const exchange = new ccxt.binance();
 
-    const supertrend = [];
-    let prevUpper = 0, prevLower = 0, prevTrend = true;
+const SYMBOL = "BTC/USDT";
+const TIMEFRAME = "15m";
+const LIMIT = 100000;
 
-    for (let i = 0; i < atr.length; i++) {
-        const index = i + period - 1;
-        const hl2 = (high[index] + low[index]) / 2;
-        const upperBand = hl2 + multiplier * atr[i];
-        const lowerBand = hl2 - multiplier * atr[i];
-
-        let finalUpper = upperBand;
-        let finalLower = lowerBand;
-
-        if (i > 0) {
-            if (close[index] > prevUpper) prevTrend = true;
-            else if (close[index] < prevLower) prevTrend = false;
-
-            if (prevTrend) finalLower = Math.max(lowerBand, prevLower);
-            else finalUpper = Math.min(upperBand, prevUpper);
-        }
-
-        const trend = close[index] > finalUpper;
-        supertrend.push({
-            time: candles[index].time,
-            value: trend ? finalLower : finalUpper,
-            trend: trend ? 'up' : 'down',
-            close: close[index]
-        });
-
-        prevUpper = finalUpper;
-        prevLower = finalLower;
-    }
-
-    return supertrend;
+// ===== Math Functions =====
+function mean(arr) {
+    return arr.reduce((a, b) => a + b, 0) / arr.length;
 }
 
-// ========== Fetch Historical Candles ==========
- 
-async function fetchCandles() {
-    const end_time_stamp = Math.floor(Date.now() / 1000)
-    const start_time_stamp = end_time_stamp - (100 * 60 * 60)
-    const response = await axios.get(`https://api.india.delta.exchange/v2/history/candles`, {
-        params : { 
-            symbol : 'BTCUSD', 
-            resolution : '15m', 
-            start : start_time_stamp, 
-            end : end_time_stamp 
-        }
-    }); 
-    //console.log(response.data.result) 
-    return response.data.result.map(c => ({
-        time: c.time,
-        open: parseFloat(c.open),
-        high: parseFloat(c.high),
-        low: parseFloat(c.low),
-        close: parseFloat(c.close),
+function std(arr) {
+    const m = mean(arr);
+    return Math.sqrt(arr.reduce((sum, x) => sum + (x - m) ** 2, 0) / arr.length);
+}
+
+function zScore(price, mu, sigma) {
+    return (price - mu) / sigma;
+}
+
+function slope(arr, period = 20) {
+    const slice = arr.slice(-period);
+    return (slice[slice.length - 1] - slice[0]) / period;
+}
+
+// ===== Fetch Historical Data =====
+async function fetchData() {
+    const ohlcv = await exchange.fetchOHLCV(SYMBOL, TIMEFRAME, undefined, LIMIT);
+    return ohlcv.map(c => ({
+        time: c[0],
+        open: c[1],
+        high: c[2],
+        low: c[3],
+        close: c[4]
     }));
 }
 
-// ========== Backtest Logic ==========
+// ===== Backtest Engine =====
 async function backtest() {
-    const candles = await fetchCandles();
-    const supertrend = calculateSupertrend(candles);
+    const data = await fetchData();
 
-    let inPosition = false;
-    let entryPrice = 0;
-    let trades = 0, wins = 0, losses = 0;
-    let totalPnL = 0;
+    let balance = 1000;
+    let equity = balance;
+    let peak = balance;
+    let drawdown = 0;
 
-    for (let i = 1; i < supertrend.length; i++) {
-        const prev = supertrend[i - 1];
-        const curr = supertrend[i];
+    let trades = [];
+    let wins = 0;
+    let losses = 0;
 
-        if (!inPosition && prev.trend !== curr.trend && curr.trend === 'up') {
-            // Enter Long
-            inPosition = true;
-            entryPrice = curr.close;
-            trades++;
-            console.log(`[BUY] @ ${entryPrice} on ${new Date(curr.time * 1000)}`);
-        } else if (inPosition && prev.trend !== curr.trend && curr.trend === 'down') {
-            // Exit Long
-            const exitPrice = curr.close;
-            const pnl = exitPrice - entryPrice;
-            totalPnL += pnl;
-            if (pnl > 0) wins++; else losses++;
-            console.log(`[SELL] @ ${exitPrice} | PnL: ${pnl.toFixed(2)}`);
-            inPosition = false;
+    let position = null;
+
+    for (let i = 60; i < data.length; i++) {
+
+        const slice = data.slice(i - 50, i);
+        const closes = slice.map(d => d.close);
+
+        const mu = mean(closes);
+        const sigma = std(closes);
+
+        const current = data[i];
+        const price = current.close;
+
+        const z = zScore(price, mu, sigma);
+        const trend = slope(closes, 20);
+
+        // ===== Entry =====
+        if (!position) {
+            if (z < -2 && trend > 0) {
+                position = {
+                    side: "buy",
+                    entry: price,
+                    sl: mu - 3 * sigma,
+                    tp: mu,
+                    time: current.time
+                };
+            }
+
+            if (z > 2 && trend < 0) {
+                position = {
+                    side: "sell",
+                    entry: price,
+                    sl: mu + 3 * sigma,
+                    tp: mu,
+                    time: current.time
+                };
+            }
+        }
+
+        // ===== Exit =====
+        if (position) {
+            let exit = null;
+
+            if (position.side === "buy") {
+                if (current.low <= position.sl) exit = position.sl;
+                if (current.high >= position.tp) exit = position.tp;
+            }
+
+            if (position.side === "sell") {
+                if (current.high >= position.sl) exit = position.sl;
+                if (current.low <= position.tp) exit = position.tp;
+            }
+
+            if (exit) {
+                let pnl;
+
+                if (position.side === "buy") {
+                    pnl = (exit - position.entry) / position.entry;
+                } else {
+                    pnl = (position.entry - exit) / position.entry;
+                }
+
+                balance += balance * pnl;
+
+                if (pnl > 0) wins++;
+                else losses++;
+
+                trades.push({
+                    side: position.side,
+                    entry: position.entry,
+                    exit,
+                    pnl: pnl * 100,
+                    entryTime: new Date(position.time).toLocaleString(),
+                    exitTime: new Date(current.time).toLocaleString()
+                });
+
+                position = null;
+
+                // ===== Drawdown =====
+                if (balance > peak) peak = balance;
+                const dd = (peak - balance) / peak;
+                if (dd > drawdown) drawdown = dd;
+            }
         }
     }
 
-    console.log(`\n=== BACKTEST SUMMARY ===`);
-    console.log(`Trades: ${trades}`);
-    console.log(`Wins: ${wins}, Losses: ${losses}`);
-    console.log(`Win Rate: ${(wins / trades * 100).toFixed(2)}%`);
-    console.log(`Total PnL: ${totalPnL.toFixed(2)}`);
+    // ===== Results =====
+    console.log("====== BACKTEST RESULT ======");
+    console.log("Final Balance:", balance.toFixed(2));
+    console.log("Total Trades:", trades.length);
+    console.log("Wins:", wins);
+    console.log("Losses:", losses);
+    console.log("Win Rate:", ((wins / trades.length) * 100).toFixed(2) + "%");
+    console.log("Max Drawdown:", (drawdown * 100).toFixed(2) + "%");
+
+    console.log("\nSample Trades:");
+    console.log(trades.slice(-5));
 }
 
+// Run
 backtest();
-

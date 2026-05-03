@@ -2,7 +2,7 @@ require("dotenv").config();
 const ccxt = require("ccxt");
 const ti = require("technicalindicators");
 const nodemailer = require('nodemailer')
-
+console.log(process.env)
 let transporter = nodemailer.createTransport({
     service: 'gmail',
     auth: {

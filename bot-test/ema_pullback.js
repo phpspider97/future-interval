@@ -79,12 +79,29 @@ async function run() {
         const tp1 = price + atrVal * 1;
         const tp2 = price + atrVal * 2;
 
-        console.log("🟢 BUY SIGNAL");
-        sendTelegram(`🟢 EMA PULL BACK BOT : BUY BTC
-        Price: ${price}
-        SL: ${sl}
-        TP1: ${tp1}
-        TP2: ${tp2}`);
+        //console.log("🟢 BUY SIGNAL");
+        // sendTelegram(`🟢 EMA PULL BACK BOT : BUY BTC
+        // Price: ${price}
+        // SL: ${sl}
+        // TP1: ${tp1}
+        // TP2: ${tp2}`);
+        sendTelegram(`
+        🚀 *EMA PULLBACK SIGNAL*
+
+        🟢 *BUY BTC*
+
+        💰 *Entry:* ${price}
+
+        🛑 *Stop Loss:* ${sl}
+
+        🎯 *Take Profit Targets:*
+        • TP1: ${tp1}
+        • TP2: ${tp2}
+
+        ━━━━━━━━━━━━━━━
+        📊 *Strategy:* EMA Pullback
+        ⏱ *Time:* ${new Date().toLocaleTimeString()}
+        `);
         //console.log({ price, sl, tp1, tp2 });
 
         // TODO: send to Telegram / webhook
@@ -97,12 +114,29 @@ async function run() {
         const tp1 = price - atrVal * 1;
         const tp2 = price - atrVal * 2;
 
-        console.log("🔴 SELL SIGNAL");
-        sendTelegram(`🔴 EMA PULL BACK BOT : SELL BTC
-        Price: ${price}
-        SL: ${sl}
-        TP1: ${tp1}
-        TP2: ${tp2}`);
+        // console.log("🔴 SELL SIGNAL");
+        // sendTelegram(`🔴 EMA PULL BACK BOT : SELL BTC
+        // Price: ${price}
+        // SL: ${sl}
+        // TP1: ${tp1}
+        // TP2: ${tp2}`);
+        sendTelegram(`
+        🚀 *EMA PULLBACK SIGNAL*
+
+        🔴 *SELL BTC*
+
+        💰 *Entry:* ${price}
+
+        🛑 *Stop Loss:* ${sl}
+
+        🎯 *Take Profit Targets:*
+        • TP1: ${tp1}
+        • TP2: ${tp2}
+
+        ━━━━━━━━━━━━━━━
+        📊 *Strategy:* EMA Pullback
+        ⏱ *Time:* ${new Date().toLocaleTimeString()}
+        `);
         //console.log({ price, sl, tp1, tp2 });
     }
 }
@@ -116,8 +150,8 @@ module.exports = { run };
 
 
 // TELEGRAM CODE
-const TOKEN = process.env.TELEGRAM_TOKEN;
-const CHAT_ID = process.env.TELEGRAM_CHAT_ID;
+const TOKEN = process.env.TELEGRAM_EMA_PULLBACK_TOKEN;
+const CHAT_ID = process.env.TELEGRAM_EMA_PULLBACK_CHAT_ID;
 
 async function sendTelegram(message) {
     try { 

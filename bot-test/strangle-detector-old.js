@@ -64,6 +64,28 @@ function getDayAfterTomorrowRange() {
     };
 }
 
+
+// ---------------- RANGE DETECTION ----------------
+function isRangeMarket(closes) {
+    const bb = ti.BollingerBands.calculate({
+        period: 20,
+        values: closes,
+        stdDev: 2
+    });
+
+    const last = bb[bb.length - 1];
+    const price = closes[closes.length - 1];
+
+    const width = last.upper - last.lower;
+
+    return {
+        ok: width < price * 0.03,
+        upper: last.upper,
+        lower: last.lower,
+        price
+    };
+}
+
 // ================= BTC PRICE =================
 async function getBTCPrice() {
     try {
@@ -151,6 +173,12 @@ async function getPremium(call, put) {
     };
 }
 
+// ---------------- PRICE DATA ----------------
+async function getPrice() {
+    const ohlcv = await exchange.fetchOHLCV(SYMBOL, TIMEFRAME, undefined, 100);
+    return ohlcv.map(c => c[4]);
+}
+
 // ================= MAIN BOT =================
 async function run() {
 
@@ -158,8 +186,10 @@ async function run() {
 
         const spot = await getBTCPrice();
         if (!spot) return;
+        const closes = await getPrice();
 
         const allOptions = await getOptions();
+        const range = isRangeMarket(closes);
 
         // 🔥 APPLY EXPIRY FILTER (DAY AFTER TOMORROW ONLY)
         const options = filterExpiry(allOptions);
@@ -170,7 +200,7 @@ async function run() {
         }
 
         // ================= ENTRY =================
-        if (position === "NONE") {
+        if (position === "NONE" && range.ok) {
 
             const selected = selectStrangle(options, spot);
             if (!selected) return;

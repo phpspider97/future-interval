@@ -1,5 +1,6 @@
 require("dotenv").config();
 const ccxt = require("ccxt"); 
+const axios = require("axios");
 
 const exchange = new ccxt.binance({
     enableRateLimit: true
@@ -82,23 +83,67 @@ async function run() {
         console.log("R:R =", rr.toFixed(2));
 
         if(side.toUpperCase() == 'BUY'){
-            sendTelegram(`🟢 MATEMATIC BOT : BUY BTC
-            Side: ${side.toUpperCase()}
-            Price: ${price}
-            Z-score: ${z.toFixed(2)}
-            Slope: ${trendSlope.toFixed(4)}
-            TP: ${tp.toFixed(2)}
-            SL: ${sl.toFixed(2)}
-            R:R: ${rr.toFixed(2)}`)
+            // sendTelegram(`🟢 MATEMATIC BOT : BUY BTC
+            // Side: ${side.toUpperCase()}
+            // Price: ${price}
+            // Z-score: ${z.toFixed(2)}
+            // Slope: ${trendSlope.toFixed(4)}
+            // TP: ${tp.toFixed(2)}
+            // SL: ${sl.toFixed(2)}
+            // R:R: ${rr.toFixed(2)}`)
+
+            sendTelegram(`
+            🚀 *MATHEMATICAL BOT SIGNAL*
+
+            ━━━━━━━━━━━━━━━━━━━
+            🟢 *TRADE:* BUY BTC  
+            📊 *Side:* ${side.toUpperCase()}  
+            💰 *Entry Price:* ${price}
+
+            ━━━━━━━━━━━━━━━━━━━
+            📈 *Z-Score:* ${z.toFixed(2)}  
+            📉 *Trend Slope:* ${trendSlope.toFixed(4)}  
+
+            ━━━━━━━━━━━━━━━━━━━
+            🎯 *Take Profit:* ${tp.toFixed(2)}  
+            🛑 *Stop Loss:* ${sl.toFixed(2)}  
+            ⚖️ *Risk/Reward:* ${rr.toFixed(2)}
+
+            ━━━━━━━━━━━━━━━━━━━
+            ⚡ *Strategy:* Mean Reversion + Trend Confirmation
+            `)
         }else{
-            sendTelegram(`🔴  MATEMATIC BOT : SELL BTC
-            Side: ${side.toUpperCase()}
-            Price: ${price}
-            Z-score: ${z.toFixed(2)}
-            Slope: ${trendSlope.toFixed(4)}
-            TP: ${tp.toFixed(2)}
-            SL: ${sl.toFixed(2)}
-            R:R: ${rr.toFixed(2)}`)
+            // sendTelegram(`🔴  MATEMATIC BOT : SELL BTC
+            // Side: ${side.toUpperCase()}
+            // Price: ${price}
+            // Z-score: ${z.toFixed(2)}
+            // Slope: ${trendSlope.toFixed(4)}
+            // TP: ${tp.toFixed(2)}
+            // SL: ${sl.toFixed(2)}
+            // R:R: ${rr.toFixed(2)}`)
+
+            sendTelegram(`
+            🚀 *MATHEMATICAL BOT SIGNAL*
+
+            ━━━━━━━━━━━━━━━━━━━
+            🔴 *TRADE:* SELL BTC  
+            📊 *Side:* ${side.toUpperCase()}  
+            💰 *Entry Price:* ${price}
+
+            ━━━━━━━━━━━━━━━━━━━
+            📈 *Z-Score:* ${z.toFixed(2)}  
+            📉 *Trend Slope:* ${trendSlope.toFixed(4)}  
+
+            ━━━━━━━━━━━━━━━━━━━
+            🎯 *Take Profit:* ${tp.toFixed(2)}  
+            🛑 *Stop Loss:* ${sl.toFixed(2)}  
+            ⚖️ *Risk/Reward:* ${rr.toFixed(2)}
+
+            ━━━━━━━━━━━━━━━━━━━
+            ⚡ *Strategy:* Mean Reversion + Trend Confirmation
+
+            ⏱ *Time:* ${new Date().toLocaleTimeString()}
+            `)
         }
 
         if (rr < 1.5) {
@@ -121,8 +166,8 @@ async function run() {
 module.exports = { run };
 
 // TELEGRAM CODE
-const TOKEN = process.env.TELEGRAM_TOKEN;
-const CHAT_ID = process.env.TELEGRAM_CHAT_ID;
+const TOKEN = process.env.TELEGRAM_MATHEMATIC_TOKEN;
+const CHAT_ID = process.env.TELEGRAM_MATHEMATIC_CHAT_ID;
 
 async function sendTelegram(message) {
     try {

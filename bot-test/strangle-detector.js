@@ -152,7 +152,7 @@ async function getPremium(call, put) {
 }
 
 // ================= MAIN BOT =================
-async function runBot() {
+async function run() {
 
     try {
 
@@ -241,4 +241,5 @@ REASON: 2x SL hit
 }
 
 // ================= LOOP =================
-setInterval(runBot, 5 * 1000);
+//setInterval(runBot, 5 * 1000);
+module.exports = { run };

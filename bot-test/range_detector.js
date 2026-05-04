@@ -177,7 +177,7 @@ async function run() {
     const now = Date.now();
 
     const isNewSignal =
-      result.trend !== lastTrend ||
+      result.trend !== lastTrend || result.trend !== 'WEAK / FAKE MARKET' ||
       result.breakout !== lastBreakout;
 
     const isCooldownOver =
@@ -186,18 +186,18 @@ async function run() {
     if (isNewSignal && isCooldownOver) {
 
       const msg = `
-🚨 *MARKET SIGNAL*
+      🚨 *MARKET SIGNAL*
 
-💰 Price: ${result.lastClose}
-📊 Trend: *${result.trend}*
-🚀 Breakout: ${result.breakout}
+      💰 Price: ${result.lastClose}
+      📊 Trend: *${result.trend}*
+      🚀 Breakout: ${result.breakout}
 
-📈 ADX: ${result.lastADX.toFixed(2)}
-📦 Volume: ${result.lastVolume}
-📊 Vol MA: ${result.lastVolMA}
+      📈 ADX: ${result.lastADX.toFixed(2)}
+      📦 Volume: ${result.lastVolume}
+      📊 Vol MA: ${result.lastVolMA}
 
-🕒 *Time* : ${new Date().toLocaleString("en-IN", { timeZone: "Asia/Kolkata" })}
-`;
+      🕒 *Time* : ${new Date().toLocaleString("en-IN", { timeZone: "Asia/Kolkata" })}
+      `;
 
       console.log(msg);
       await sendTelegram(msg);

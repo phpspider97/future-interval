@@ -138,15 +138,15 @@ async function tryEnter() {
     const today = now.toDateString();
 
     if (hasEnteredToday && lastTradeDate === today) return;
-    if (!inTimeRange(0, 1, 0, 55)) return;
+    if (!inTimeRange(11, 1, 11, 55)) return;
 
     console.log("🔵 ENTRY CHECK");
 
     const options = await getOptions();
 
     const tomorrow = new Date(now);
-    //tomorrow.setDate(tomorrow.getDate() + 1);
-    tomorrow.setDate(tomorrow.getDate());
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    //tomorrow.setDate(tomorrow.getDate());
 
     const nextExpiry = options.filter(o =>
         new Date(o.expiry).toDateString() === tomorrow.toDateString()
@@ -239,7 +239,8 @@ async function monitor() {
 
     // 📊 Periodic update (every 60 sec)
     const now = Date.now();
-    if (now - lastUpdateTime > 60*60000) {
+    if (now - lastUpdateTime > 15*60000) {
+        if(currentPremium < position.initialPremium) return true
         await sendTelegram(`📊 <b>STRANGLE UPDATE</b>
 
         🟢 <b>CALL</b>

@@ -159,7 +159,8 @@ async function sendTelegram(message) {
     try { 
         await axios.post(`https://api.telegram.org/bot${TOKEN}/sendMessage`, {
             chat_id: CHAT_ID,
-            text: message
+            text: message,
+            parse_mode: "HTML"
         });
     } catch (err) {
         console.error("Telegram Error:", err.message);

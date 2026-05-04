@@ -29,7 +29,7 @@ async function sendTelegram(message) {
     const res = await axios.post(url, {
       chat_id: process.env.TELEGRAM_RANGE_DETECTOR_CHAT_ID,
       text: message,
-      parse_mode: "Markdown"
+      parse_mode: "HTML"
     });
 
     if (!res.data.ok) {
@@ -139,7 +139,7 @@ function analyzeMarket(data, ind) {
   }
 
   else {
-    trend = "WEAK / FAKE MARKET";
+   // trend = "WEAK / FAKE MARKET";
   }
 
   // ===== BREAKOUT =====
@@ -177,13 +177,13 @@ async function run() {
     const now = Date.now();
 
     const isNewSignal =
-      result.trend !== lastTrend || result.trend !== 'WEAK / FAKE MARKET' ||
+      result.trend !== lastTrend ||
       result.breakout !== lastBreakout;
 
     const isCooldownOver =
       now - lastSignalTime > COOLDOWN;
 
-    if (isNewSignal && isCooldownOver) {
+    if (isNewSignal && isCooldownOver && result.trend !== 'NO TRADE') {
 
       const msg = `
       🚨 *MARKET SIGNAL*

@@ -22,6 +22,7 @@ let hasEnteredToday = false;
 let lastTradeDate = null;
 let isRunning = false;
 let lastUpdateTime = 0;
+let is_entered = false
 
 // ===== TELEGRAM FUNCTION =====
 async function sendTelegram(message) {
@@ -91,7 +92,7 @@ function getStrike(o) {
 async function selectStrikes(options) {
     const calls = options.filter(o => o.optionType === "call");
     const puts = options.filter(o => o.optionType === "put");
-
+   // console.log(puts)
     // 1️⃣ Try delta
     let call = calls.find(o => {
         const d = getDelta(o);
@@ -108,8 +109,9 @@ async function selectStrikes(options) {
         console.log("⚠️ Using premium fallback (40–60)");
         //console.log(calls)
         for (let c of calls) {
+            //console.log(c.symbol)
             const price = await getMark(c.symbol);
-            if (price >= 40 && price <= 60) {
+            if (price >= 40 && price <= 100) {
                 call = c;
                 break;
             }
@@ -117,7 +119,7 @@ async function selectStrikes(options) {
 
         for (let p of puts) {
             const price = await getMark(p.symbol);
-            if (price >= 40 && price <= 60) {
+            if (price >= 40 && price <= 100) {
                 put = p;
                 break;
             }
@@ -138,7 +140,7 @@ async function tryEnter() {
     const today = now.toDateString();
 
     if (hasEnteredToday && lastTradeDate === today) return;
-    if (!inTimeRange(11, 1, 11, 55)) return;
+    if (!inTimeRange(12, 1, 13, 55)) return;
 
     console.log("🔵 ENTRY CHECK");
 
@@ -147,11 +149,12 @@ async function tryEnter() {
     const tomorrow = new Date(now);
     tomorrow.setDate(tomorrow.getDate() + 1);
     //tomorrow.setDate(tomorrow.getDate());
+    //console.log(tomorrow.setDate(tomorrow.getDate()))
 
     const nextExpiry = options.filter(o =>
         new Date(o.expiry).toDateString() === tomorrow.toDateString()
     );
-
+        //console.log(nextExpiry)
     const { call, put } = await selectStrikes(nextExpiry);
     if (!call || !put) return;
 
@@ -174,7 +177,7 @@ async function tryEnter() {
 
     hasEnteredToday = true;
     lastTradeDate = today;
-
+    //console.log(call)
     await sendTelegram(`📥 <b>STRANGLE ENTRY</b>
 
     🟢 <b>CALL LEG</b>
@@ -239,8 +242,8 @@ async function monitor() {
 
     // 📊 Periodic update (every 60 sec)
     const now = Date.now();
-    if (now - lastUpdateTime > 15*60000) {
-        if(currentPremium < position.initialPremium) return true
+    if (now - lastUpdateTime > 30*60000) {
+        //if(currentPremium < position.initialPremium && is_entered) return true
         await sendTelegram(`📊 <b>STRANGLE UPDATE</b>
 
         🟢 <b>CALL</b>
@@ -258,6 +261,7 @@ async function monitor() {
         🕒 Time : ${new Date().toLocaleString("en-IN", { timeZone: "Asia/Kolkata" })}
         `);
         lastUpdateTime = now;
+        is_entered = true
     }
 }
 
@@ -284,6 +288,7 @@ async function tryExit() {
 
     position = null;
     hasEnteredToday = false;
+    is_entered = false
 }
 
 // 🧠 MAIN LOOP
@@ -304,5 +309,5 @@ async function run() {
 }
 
 // 🔁 START BOT
-//setInterval(run, INTERVAL);
-module.exports = { run };
+setInterval(run, INTERVAL);
+//module.exports = { run };

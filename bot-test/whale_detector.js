@@ -113,7 +113,7 @@ async function run() {
             🐋 *WHALE DETECTOR BOT*
 
             ━━━━━━━━━━━━━━━━━━━
-            📊 *Overview:* ${result.direction === "BUY" ? "🟢 BUY" : "🔴 SELL"}
+            📊 *Overview:* ${result.direction === "LONG" ? "🟢 BUY" : "🔴 SELL"}
 
             ⚡ *Direction:* ${result.direction}
             ⚡ *Strength:* ${result.strength}

@@ -92,7 +92,7 @@ function getStrike(o) {
 async function selectStrikes(options) {
     const calls = options.filter(o => o.optionType === "call");
     const puts = options.filter(o => o.optionType === "put");
-   // console.log(puts)
+    //console.log(puts)
     // 1️⃣ Try delta
     let call = calls.find(o => {
         const d = getDelta(o);
@@ -140,7 +140,7 @@ async function tryEnter() {
     const today = now.toDateString();
 
     if (hasEnteredToday && lastTradeDate === today) return;
-    if (!inTimeRange(12, 1, 13, 55)) return;
+    if (!inTimeRange(12, 1, 17, 55)) return;
 
     console.log("🔵 ENTRY CHECK");
 
@@ -149,7 +149,7 @@ async function tryEnter() {
     const tomorrow = new Date(now);
     tomorrow.setDate(tomorrow.getDate() + 1);
     //tomorrow.setDate(tomorrow.getDate());
-    //console.log(tomorrow.setDate(tomorrow.getDate()))
+    console.log(tomorrow.setDate(tomorrow.getDate()))
 
     const nextExpiry = options.filter(o =>
         new Date(o.expiry).toDateString() === tomorrow.toDateString()

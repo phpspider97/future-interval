@@ -1,154 +1,283 @@
-require("ccxt");
-
+require("dotenv").config();
 const ccxt = require("ccxt");
-const exchange = new ccxt.binance();
+const moment = require("moment");
+const axios = require("axios");
 
-const SYMBOL = "BTC/USDT";
-const TIMEFRAME = "15m";
-const LIMIT = 100000;
+const exchange = new ccxt.delta({
+    enableRateLimit: true,
+});
 
-// ===== Math Functions =====
-function mean(arr) {
-    return arr.reduce((a, b) => a + b, 0) / arr.length;
+// ================= CONFIG =================
+const SYMBOL = "BTC/USDT:USDT";
+const DAYS_BACK = 5;
+const TARGET_DELTA = 0.20;
+
+// ================= TIME =================
+function getEntryTimeUTC(date) {
+    return moment(date)
+        .utc()
+        .hour(5)
+        .minute(30)
+        .second(0)
+        .millisecond(0)
+        .valueOf();
 }
 
-function std(arr) {
-    const m = mean(arr);
-    return Math.sqrt(arr.reduce((sum, x) => sum + (x - m) ** 2, 0) / arr.length);
+function toIST(ts) {
+    return moment(ts)
+        .utcOffset("+05:30")
+        .format("HH:mm");
 }
 
-function zScore(price, mu, sigma) {
-    return (price - mu) / sigma;
+// ================= CANDLE =================
+async function get11amCandle(date) {
+    const since = getEntryTimeUTC(date);
+
+    const candles = await exchange.fetchOHLCV(
+        SYMBOL,
+        "5m",
+        since - (30 * 60 * 1000),
+        20
+    );
+
+    if (!candles || candles.length === 0) return null;
+
+    const target = candles.find(c =>
+        moment(c[0]).utc().format("HH:mm") === "05:30"
+    );
+
+    return target || candles[candles.length - 1];
 }
 
-function slope(arr, period = 20) {
-    const slice = arr.slice(-period);
-    return (slice[slice.length - 1] - slice[0]) / period;
+// ================= API =================
+async function getOptionTickers() {
+    try {
+        const res = await axios.get("https://api.delta.exchange/v2/tickers");
+        return res.data.result;
+    } catch {
+        return [];
+    }
 }
 
-// ===== Fetch Historical Data =====
-async function fetchData() {
-    const ohlcv = await exchange.fetchOHLCV(SYMBOL, TIMEFRAME, undefined, LIMIT);
-    return ohlcv.map(c => ({
-        time: c[0],
-        open: c[1],
-        high: c[2],
-        low: c[3],
-        close: c[4]
-    }));
+// ================= HELPERS =================
+function isValidDelta(d) {
+    return d !== null && !isNaN(Number(d));
 }
 
-// ===== Backtest Engine =====
-async function backtest() {
-    const data = await fetchData();
+function formatDelta(d) {
+    const num = Number(d);
+    return isNaN(num) ? "NA" : num.toFixed(2);
+}
 
-    let balance = 1000;
-    let equity = balance;
-    let peak = balance;
-    let drawdown = 0;
+// ================= BTC FILTER =================
+function isBTCOption(t) {
+    const s = t.symbol;
 
-    let trades = [];
-    let wins = 0;
-    let losses = 0;
+    return (
+        s &&
+        (
+            s.startsWith("C-BTC") ||
+            s.startsWith("P-BTC") ||
+            s.includes("-BTC-")
+        ) &&
+        s.match(/\d{6}$/) &&
+        t.greeks &&
+        isValidDelta(t.greeks.delta)
+    );
+}
 
-    let position = null;
+// ================= EXPIRY =================
+function extractExpiry(symbol) {
+    const match = symbol.match(/(\d{6})$/);
+    return match ? match[1] : null;
+}
 
-    for (let i = 60; i < data.length; i++) {
+function parseExpiry(e) {
+    return moment.utc(e, "DDMMYY");
+}
 
-        const slice = data.slice(i - 50, i);
-        const closes = slice.map(d => d.close);
+function getNextDayExpiry(tickers, date) {
+    const target = moment.utc(date).add(1, "day").startOf("day");
 
-        const mu = mean(closes);
-        const sigma = std(closes);
+    const map = new Map();
 
-        const current = data[i];
-        const price = current.close;
+    for (let t of tickers) {
+        const exp = extractExpiry(t.symbol);
+        if (!exp) continue;
 
-        const z = zScore(price, mu, sigma);
-        const trend = slope(closes, 20);
-
-        // ===== Entry =====
-        if (!position) {
-            if (z < -2 && trend > 0) {
-                position = {
-                    side: "buy",
-                    entry: price,
-                    sl: mu - 3 * sigma,
-                    tp: mu,
-                    time: current.time
-                };
-            }
-
-            if (z > 2 && trend < 0) {
-                position = {
-                    side: "sell",
-                    entry: price,
-                    sl: mu + 3 * sigma,
-                    tp: mu,
-                    time: current.time
-                };
-            }
-        }
-
-        // ===== Exit =====
-        if (position) {
-            let exit = null;
-
-            if (position.side === "buy") {
-                if (current.low <= position.sl) exit = position.sl;
-                if (current.high >= position.tp) exit = position.tp;
-            }
-
-            if (position.side === "sell") {
-                if (current.high >= position.sl) exit = position.sl;
-                if (current.low <= position.tp) exit = position.tp;
-            }
-
-            if (exit) {
-                let pnl;
-
-                if (position.side === "buy") {
-                    pnl = (exit - position.entry) / position.entry;
-                } else {
-                    pnl = (position.entry - exit) / position.entry;
-                }
-
-                balance += balance * pnl;
-
-                if (pnl > 0) wins++;
-                else losses++;
-
-                trades.push({
-                    side: position.side,
-                    entry: position.entry,
-                    exit,
-                    pnl: pnl * 100,
-                    entryTime: new Date(position.time).toLocaleString(),
-                    exitTime: new Date(current.time).toLocaleString()
-                });
-
-                position = null;
-
-                // ===== Drawdown =====
-                if (balance > peak) peak = balance;
-                const dd = (peak - balance) / peak;
-                if (dd > drawdown) drawdown = dd;
-            }
+        if (!map.has(exp)) {
+            map.set(exp, parseExpiry(exp));
         }
     }
 
-    // ===== Results =====
-    console.log("====== BACKTEST RESULT ======");
-    console.log("Final Balance:", balance.toFixed(2));
-    console.log("Total Trades:", trades.length);
-    console.log("Wins:", wins);
-    console.log("Losses:", losses);
-    console.log("Win Rate:", ((wins / trades.length) * 100).toFixed(2) + "%");
-    console.log("Max Drawdown:", (drawdown * 100).toFixed(2) + "%");
+    const list = Array.from(map.entries())
+        .map(([str, d]) => ({ str, d }))
+        .sort((a, b) => a.d - b.d);
 
-    console.log("\nSample Trades:");
-    console.log(trades.slice(-5));
+    console.log("📅 Expiries:", list.map(e => e.str));
+
+    for (let e of list) {
+        if (e.d.isSame(target, "day")) return e.str;
+    }
+
+    for (let e of list) {
+        if (e.d.isAfter(date)) return e.str;
+    }
+
+    return null;
 }
 
-// Run
-backtest();
+// ================= OPTION FILTER =================
+function filterOptions(tickers, expiry) {
+    return tickers.filter(t => extractExpiry(t.symbol) === expiry);
+}
+
+// ================= DELTA SELECT =================
+function findClosestDelta(options, target, type) {
+    const filtered = options.filter(o => o.symbol.startsWith(`${type}-`));
+
+    let best = null;
+    let min = Infinity;
+
+    for (let o of filtered) {
+        const d = Number(o.greeks.delta);
+        if (isNaN(d)) continue;
+
+        const diff = Math.abs(Math.abs(d) - target);
+
+        if (diff < min) {
+            min = diff;
+            best = o;
+        }
+    }
+
+    return best;
+}
+
+// ================= BACKTEST =================
+async function runBacktest() {
+
+    const summary = [];
+
+    for (let i = 1; i <= DAYS_BACK; i++) {
+
+        const date = moment().subtract(i, "days");
+        console.log(`\n📅 ${date.format("YYYY-MM-DD")}`);
+
+        const entryTimeIST = "11:00";
+
+        // Spot
+        const candle = await get11amCandle(date);
+        if (!candle) continue;
+
+        const spot = candle[4];
+        console.log("📊 Spot:", spot);
+
+        // Tickers
+        const all = await getOptionTickers();
+        if (!all.length) continue;
+
+        const tickers = all.filter(isBTCOption);
+        console.log("📊 BTC Options:", tickers.length);
+
+        if (!tickers.length) continue;
+
+        // Expiry
+        const expiry = getNextDayExpiry(tickers, date);
+        if (!expiry) continue;
+
+        console.log("📅 Selected Expiry:", expiry);
+
+        const options = filterOptions(tickers, expiry);
+        if (!options.length) continue;
+
+        // Select
+        const call = findClosestDelta(options, TARGET_DELTA, "C");
+        const put = findClosestDelta(options, TARGET_DELTA, "P");
+
+        if (!call || !put) continue;
+
+        const callStrike = call.strike_price;
+        const putStrike = put.strike_price;
+
+        // ENTRY TABLE
+        console.log("\n📥 ENTRY");
+        console.table([
+            {
+                Leg: "CALL",
+                Symbol: call.symbol,
+                Strike: callStrike,
+                Delta: formatDelta(call.greeks.delta),
+            },
+            {
+                Leg: "PUT",
+                Symbol: put.symbol,
+                Strike: putStrike,
+                Delta: formatDelta(put.greeks.delta),
+            }
+        ]);
+
+        // TRACK
+        const since = getEntryTimeUTC(date);
+
+        const candles = await exchange.fetchOHLCV(
+            SYMBOL,
+            "5m",
+            since,
+            100
+        );
+
+        let result = {
+            Date: date.format("YYYY-MM-DD"),
+            Spot: spot,
+            CallStrike: callStrike,
+            PutStrike: putStrike,
+            Entry_IST: entryTimeIST,
+            Exit_IST: "-",
+            Crossed: "NO",
+            Side: "-",
+            Event: "No Cross"
+        };
+
+        let lastTime = "-";
+
+        for (let c of candles) {
+            const high = c[2];
+            const low = c[3];
+            const time = toIST(c[0]);
+
+            lastTime = time;
+
+            if (high >= callStrike) {
+                result.Crossed = "YES";
+                result.Side = "CALL";
+                result.Event = "Call Strike Hit";
+                result.Exit_IST = time;
+                break;
+            }
+
+            if (low <= putStrike) {
+                result.Crossed = "YES";
+                result.Side = "PUT";
+                result.Event = "Put Strike Hit";
+                result.Exit_IST = time;
+                break;
+            }
+        }
+
+        if (result.Exit_IST === "-") {
+            result.Exit_IST = lastTime;
+        }
+
+        console.log("\n📊 RESULT");
+        console.table([result]);
+
+        summary.push(result);
+    }
+
+    console.log("\n📊 FINAL SUMMARY (IST)");
+    console.table(summary);
+}
+
+// RUN
+runBacktest();

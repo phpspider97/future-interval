@@ -76,8 +76,8 @@ async function run() {
         lastSignal = 1;
 
         const sl = price - atrVal * atrMultiplier;
-        const tp1 = price + atrVal * 1;
-        const tp2 = price + atrVal * 2;
+        const tp1 = price + atrVal * 3;
+        const tp2 = price + atrVal * 5;
 
         //console.log("🟢 BUY SIGNAL");
         // sendTelegram(`🟢 EMA PULL BACK BOT : BUY BTC
@@ -112,8 +112,8 @@ async function run() {
         lastSignal = -1;
 
         const sl = price + atrVal * atrMultiplier;
-        const tp1 = price - atrVal * 1;
-        const tp2 = price - atrVal * 2;
+        const tp1 = price - atrVal * 3;
+        const tp2 = price - atrVal * 5;
 
         // console.log("🔴 SELL SIGNAL");
         // sendTelegram(`🔴 EMA PULL BACK BOT : SELL BTC

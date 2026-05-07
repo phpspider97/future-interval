@@ -74,7 +74,7 @@ let profit_margin                   =   5
 let stoploss_both_side              =   0
 let total_error_count               =   0 
 let number_of_time_order_executed   =   0
-let roundedToHundred                =   (price) => Math.round(price / 100) * 100
+let roundedToHundred                =   (price) => Math.round(price / 5) * 5
 let reconnectInterval               =   2000
 let order_in_progress               =   false 
 let is_price_out_of_grid            =   false
@@ -273,15 +273,20 @@ async function setRangeLimitOrder() {
                 }
             }); 
         } 
-        console.log('given_price_range____',numberOfGrids, grid_spacing)
-        //return true
+        console.log('given_price_range____',round_of_current_price, numberOfGrids, grid_spacing)
+        //console.log('upper_price',upper_price)
+        //console.log('lower_price',lower_price)
+       
         //console.log('given_price_range___', round_of_current_price, upper_price, lower_price, grid_spacing)
-        const first_five = given_price_range.slice(1, 50)
+        const first_five = given_price_range.slice(1, 50).reverse()
         const last_five = given_price_range.slice(-50)
 
-        for (const data of first_five) {
-            order_in_progress = false;
-            //console.log('buy_data___',data)
+        //console.log('first_five',first_five)
+        //console.log('last_five',last_five)
+        //return true
+
+        for (const data of first_five) { 
+            order_in_progress = false; 
             await createOrder('buy', data.price,size);
             await sleep(500);
         }
@@ -292,6 +297,7 @@ async function setRangeLimitOrder() {
             await sleep(500);
         }
   
+          
         updateOrderInfo(JSON.stringify({
             product_id,
             upper_price,
@@ -330,7 +336,7 @@ async function generateEncryptSignature(signaturePayload) {
 }
 async function createOrder(bid_type,order_price,size,byDynamic=false){
     if(byDynamic){
-        console.log('total_error_count___',total_error_count)
+        //console.log('total_error_count___',total_error_count)
     }
     // if(total_error_count>3){
     //     return true
@@ -449,7 +455,7 @@ gridEmitter.on("grid_start", async () => {
 
 gridEmitter.on("grid_stop", async () => { 
     total_error_count = 0
-    //await cancelAllOpenOrder() 
+    await cancelAllOpenOrder() 
     fs.writeFileSync('./grid/orderInfo.json', '', 'utf8')
     sendEmail('',`BOT STOP BUTTON PRESSED`)
     is_live = false 

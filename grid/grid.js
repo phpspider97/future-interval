@@ -79,7 +79,7 @@ let reconnectInterval               =   2000
 let order_in_progress               =   false 
 let is_price_out_of_grid            =   false
 let body_param_for_testing          =   {}
-let size                            =   1
+let size                            =   10
  
 function wsConnect() { 
     const WEBSOCKET_URL = SOCKET_URL

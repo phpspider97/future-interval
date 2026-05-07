@@ -1,283 +1,131 @@
 require("dotenv").config();
 const ccxt = require("ccxt");
-const moment = require("moment");
-const axios = require("axios");
 
-const exchange = new ccxt.delta({
-    enableRateLimit: true,
-});
+const exchange = new ccxt.binance({ enableRateLimit: true });
 
-// ================= CONFIG =================
-const SYMBOL = "BTC/USDT:USDT";
-const DAYS_BACK = 5;
-const TARGET_DELTA = 0.20;
+const SYMBOL = "BTC/USDT";
+const TIMEFRAME = "1m";
+const DAYS = 30;
 
-// ================= TIME =================
-function getEntryTimeUTC(date) {
-    return moment(date)
-        .utc()
-        .hour(5)
-        .minute(30)
-        .second(0)
-        .millisecond(0)
-        .valueOf();
+// STRATEGY SETTINGS
+const STRIKE_DISTANCE = 1000;
+const SL_BUFFER = 300;
+const HOLD_MINUTES = 240; // 4 hours
+
+// ===== TIME HELPERS =====
+function getHour(ts) {
+    return parseInt(new Date(ts).toLocaleString("en-IN", {
+        timeZone: "Asia/Kolkata",
+        hour: "2-digit",
+        hour12: false
+    }));
 }
 
-function toIST(ts) {
-    return moment(ts)
-        .utcOffset("+05:30")
-        .format("HH:mm");
+function getInterval(hour) {
+    if (hour < 4) return "00-04";
+    if (hour < 8) return "04-08";
+    if (hour < 12) return "08-12";
+    if (hour < 16) return "12-16";
+    if (hour < 20) return "16-20";
+    return "20-24";
 }
 
-// ================= CANDLE =================
-async function get11amCandle(date) {
-    const since = getEntryTimeUTC(date);
+// ===== FETCH DATA =====
+async function fetchData() {
+    const since = Date.now() - DAYS * 24 * 60 * 60 * 1000;
 
-    const candles = await exchange.fetchOHLCV(
-        SYMBOL,
-        "5m",
-        since - (30 * 60 * 1000),
-        20
-    );
+    let all = [];
+    let fetchSince = since;
 
-    if (!candles || candles.length === 0) return null;
+    while (true) {
+        const ohlcv = await exchange.fetchOHLCV(SYMBOL, TIMEFRAME, fetchSince, 1000);
+        if (ohlcv.length === 0) break;
 
-    const target = candles.find(c =>
-        moment(c[0]).utc().format("HH:mm") === "05:30"
-    );
+        all = all.concat(ohlcv);
+        fetchSince = ohlcv[ohlcv.length - 1][0] + 1;
 
-    return target || candles[candles.length - 1];
-}
-
-// ================= API =================
-async function getOptionTickers() {
-    try {
-        const res = await axios.get("https://api.delta.exchange/v2/tickers");
-        return res.data.result;
-    } catch {
-        return [];
-    }
-}
-
-// ================= HELPERS =================
-function isValidDelta(d) {
-    return d !== null && !isNaN(Number(d));
-}
-
-function formatDelta(d) {
-    const num = Number(d);
-    return isNaN(num) ? "NA" : num.toFixed(2);
-}
-
-// ================= BTC FILTER =================
-function isBTCOption(t) {
-    const s = t.symbol;
-
-    return (
-        s &&
-        (
-            s.startsWith("C-BTC") ||
-            s.startsWith("P-BTC") ||
-            s.includes("-BTC-")
-        ) &&
-        s.match(/\d{6}$/) &&
-        t.greeks &&
-        isValidDelta(t.greeks.delta)
-    );
-}
-
-// ================= EXPIRY =================
-function extractExpiry(symbol) {
-    const match = symbol.match(/(\d{6})$/);
-    return match ? match[1] : null;
-}
-
-function parseExpiry(e) {
-    return moment.utc(e, "DDMMYY");
-}
-
-function getNextDayExpiry(tickers, date) {
-    const target = moment.utc(date).add(1, "day").startOf("day");
-
-    const map = new Map();
-
-    for (let t of tickers) {
-        const exp = extractExpiry(t.symbol);
-        if (!exp) continue;
-
-        if (!map.has(exp)) {
-            map.set(exp, parseExpiry(exp));
-        }
+        if (ohlcv.length < 1000) break;
     }
 
-    const list = Array.from(map.entries())
-        .map(([str, d]) => ({ str, d }))
-        .sort((a, b) => a.d - b.d);
-
-    console.log("📅 Expiries:", list.map(e => e.str));
-
-    for (let e of list) {
-        if (e.d.isSame(target, "day")) return e.str;
-    }
-
-    for (let e of list) {
-        if (e.d.isAfter(date)) return e.str;
-    }
-
-    return null;
+    return all;
 }
 
-// ================= OPTION FILTER =================
-function filterOptions(tickers, expiry) {
-    return tickers.filter(t => extractExpiry(t.symbol) === expiry);
-}
+// ===== BACKTEST =====
+function runBacktest(data) {
+    let stats = {};
+    let usedIntervals = new Set();
+    let totalTrades = 0;
 
-// ================= DELTA SELECT =================
-function findClosestDelta(options, target, type) {
-    const filtered = options.filter(o => o.symbol.startsWith(`${type}-`));
+    for (let i = 0; i < data.length - HOLD_MINUTES; i++) {
+        const [timestamp, , , , close] = data[i];
 
-    let best = null;
-    let min = Infinity;
+        const hour = getHour(timestamp);
+        const interval = getInterval(hour);
+        const day = new Date(timestamp).toDateString();
 
-    for (let o of filtered) {
-        const d = Number(o.greeks.delta);
-        if (isNaN(d)) continue;
+        const key = `${day}-${interval}`;
 
-        const diff = Math.abs(Math.abs(d) - target);
+        // ✅ only 1 trade per interval per day
+        if (usedIntervals.has(key)) continue;
+        usedIntervals.add(key);
 
-        if (diff < min) {
-            min = diff;
-            best = o;
-        }
-    }
+        const entryPrice = close;
 
-    return best;
-}
+        const callSL = entryPrice + (STRIKE_DISTANCE - SL_BUFFER);
+        const putSL = entryPrice - (STRIKE_DISTANCE - SL_BUFFER);
 
-// ================= BACKTEST =================
-async function runBacktest() {
+        let slHit = false;
 
-    const summary = [];
+        // check next 4 hours
+        for (let j = 1; j <= HOLD_MINUTES; j++) {
+            const [, , high, low] = data[i + j];
 
-    for (let i = 1; i <= DAYS_BACK; i++) {
-
-        const date = moment().subtract(i, "days");
-        console.log(`\n📅 ${date.format("YYYY-MM-DD")}`);
-
-        const entryTimeIST = "11:00";
-
-        // Spot
-        const candle = await get11amCandle(date);
-        if (!candle) continue;
-
-        const spot = candle[4];
-        console.log("📊 Spot:", spot);
-
-        // Tickers
-        const all = await getOptionTickers();
-        if (!all.length) continue;
-
-        const tickers = all.filter(isBTCOption);
-        console.log("📊 BTC Options:", tickers.length);
-
-        if (!tickers.length) continue;
-
-        // Expiry
-        const expiry = getNextDayExpiry(tickers, date);
-        if (!expiry) continue;
-
-        console.log("📅 Selected Expiry:", expiry);
-
-        const options = filterOptions(tickers, expiry);
-        if (!options.length) continue;
-
-        // Select
-        const call = findClosestDelta(options, TARGET_DELTA, "C");
-        const put = findClosestDelta(options, TARGET_DELTA, "P");
-
-        if (!call || !put) continue;
-
-        const callStrike = call.strike_price;
-        const putStrike = put.strike_price;
-
-        // ENTRY TABLE
-        console.log("\n📥 ENTRY");
-        console.table([
-            {
-                Leg: "CALL",
-                Symbol: call.symbol,
-                Strike: callStrike,
-                Delta: formatDelta(call.greeks.delta),
-            },
-            {
-                Leg: "PUT",
-                Symbol: put.symbol,
-                Strike: putStrike,
-                Delta: formatDelta(put.greeks.delta),
-            }
-        ]);
-
-        // TRACK
-        const since = getEntryTimeUTC(date);
-
-        const candles = await exchange.fetchOHLCV(
-            SYMBOL,
-            "5m",
-            since,
-            100
-        );
-
-        let result = {
-            Date: date.format("YYYY-MM-DD"),
-            Spot: spot,
-            CallStrike: callStrike,
-            PutStrike: putStrike,
-            Entry_IST: entryTimeIST,
-            Exit_IST: "-",
-            Crossed: "NO",
-            Side: "-",
-            Event: "No Cross"
-        };
-
-        let lastTime = "-";
-
-        for (let c of candles) {
-            const high = c[2];
-            const low = c[3];
-            const time = toIST(c[0]);
-
-            lastTime = time;
-
-            if (high >= callStrike) {
-                result.Crossed = "YES";
-                result.Side = "CALL";
-                result.Event = "Call Strike Hit";
-                result.Exit_IST = time;
-                break;
-            }
-
-            if (low <= putStrike) {
-                result.Crossed = "YES";
-                result.Side = "PUT";
-                result.Event = "Put Strike Hit";
-                result.Exit_IST = time;
+            if (high >= callSL || low <= putSL) {
+                slHit = true;
                 break;
             }
         }
 
-        if (result.Exit_IST === "-") {
-            result.Exit_IST = lastTime;
+        if (!stats[interval]) {
+            stats[interval] = { total: 0, slHit: 0 };
         }
 
-        console.log("\n📊 RESULT");
-        console.table([result]);
+        stats[interval].total++;
+        totalTrades++;
 
-        summary.push(result);
+        if (slHit) stats[interval].slHit++;
     }
 
-    console.log("\n📊 FINAL SUMMARY (IST)");
-    console.table(summary);
+    return { stats, totalTrades };
 }
 
-// RUN
-runBacktest();
+// ===== MAIN =====
+(async () => {
+    console.log("⏳ Fetching data...");
+    const data = await fetchData();
+
+    console.log("⚙️ Running realistic backtest...");
+    const { stats, totalTrades } = runBacktest(data);
+
+    let result = [];
+
+    for (let interval in stats) {
+        const { total, slHit } = stats[interval];
+        const prob = (slHit / total) * 100;
+
+        result.push({
+            Interval: interval,
+            Trades: total,
+            SL_Hit: slHit,
+            SL_Probability: prob.toFixed(2) + "%"
+        });
+    }
+
+    // sort safest first
+    result.sort((a, b) => parseFloat(a.SL_Probability) - parseFloat(b.SL_Probability));
+
+    console.log("\n🎯 BEST INTERVALS (REALISTIC):");
+    console.table(result);
+
+    console.log(`\n✅ TOTAL TRADES (30 DAYS): ${totalTrades}`);
+})();

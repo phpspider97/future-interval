@@ -1,5 +1,5 @@
 require("dotenv").config();
-const ccxt = require("ccxt"); 
+const ccxt = require("ccxt");
 const axios = require("axios");
 
 const exchange = new ccxt.binance({
@@ -8,6 +8,13 @@ const exchange = new ccxt.binance({
 
 const SYMBOL = "BTC/USDT";
 const TIMEFRAME = "15m";
+
+// ===== SETTINGS =====
+const LIMIT = 200;
+const Z_ENTRY = 1.5;       // normal mode
+const Z_SNIPER = 2.5;      // sniper mode
+const RR_MIN = 1.5;
+const USE_SNIPER = false;  // true = very selective trades
 
 // ===== Math Functions =====
 function mean(arr) {
@@ -23,15 +30,21 @@ function zScore(price, mu, sigma) {
     return (price - mu) / sigma;
 }
 
-// ===== Trend Slope =====
-function slope(arr, period = 20) {
-    const recent = arr.slice(-period);
-    return (recent[recent.length - 1] - recent[0]) / period;
+// ===== EMA Trend =====
+function ema(prices, period = 50) {
+    const k = 2 / (period + 1);
+    let emaVal = prices[0];
+
+    for (let i = 1; i < prices.length; i++) {
+        emaVal = prices[i] * k + emaVal * (1 - k);
+    }
+
+    return emaVal;
 }
 
 // ===== Fetch Data =====
 async function fetchPrices() {
-    const ohlcv = await exchange.fetchOHLCV(SYMBOL, TIMEFRAME, undefined, 100);
+    const ohlcv = await exchange.fetchOHLCV(SYMBOL, TIMEFRAME, undefined, LIMIT);
     return ohlcv.map(c => c[4]);
 }
 
@@ -40,21 +53,23 @@ async function run() {
     try {
         const prices = await fetchPrices();
 
-        const mu = mean(prices.slice(-50));
-        const sigma = std(prices.slice(-50));
+        const mu = mean(prices.slice(-100));
+        const sigma = std(prices.slice(-100));
         const price = prices[prices.length - 1];
 
         const z = zScore(price, mu, sigma);
-        const trendSlope = slope(prices, 20);
+        const ema50 = ema(prices.slice(-100), 50);
 
         let side = null;
 
-        // ===== Entry + Trend Filter =====
-        if (z < -2 && trendSlope > 0) side = "buy";
-        if (z > 2 && trendSlope < 0) side = "sell";
+        const threshold = USE_SNIPER ? Z_SNIPER : Z_ENTRY;
+
+        // ===== ENTRY LOGIC =====
+        if (z < -threshold && price > ema50) side = "buy";
+        if (z > threshold && price < ema50) side = "sell";
 
         if (!side) {
-            //console.log("No trade | z:", z.toFixed(2), "| slope:", trendSlope.toFixed(4));
+            //console.log(`No trade | z: ${z.toFixed(2)} | price: ${price} | EMA: ${ema50.toFixed(2)}`);
             return;
         }
 
@@ -73,101 +88,57 @@ async function run() {
         const reward = Math.abs(tp - price);
         const rr = reward / risk;
 
+        // ===== FILTER BAD TRADES =====
+        if (rr < RR_MIN) {
+            console.log("Skipped: Low R:R", rr.toFixed(2));
+            return;
+        }
+
         console.log("------ TRADE SIGNAL ------");
         console.log("Side:", side.toUpperCase());
         console.log("Price:", price);
         console.log("Z-score:", z.toFixed(2));
-        console.log("Slope:", trendSlope.toFixed(4));
+        console.log("EMA50:", ema50.toFixed(2));
         console.log("TP:", tp.toFixed(2));
         console.log("SL:", sl.toFixed(2));
         console.log("R:R =", rr.toFixed(2));
 
-        if(side.toUpperCase() == 'BUY'){
-            // sendTelegram(`🟢 MATEMATIC BOT : BUY BTC
-            // Side: ${side.toUpperCase()}
-            // Price: ${price}
-            // Z-score: ${z.toFixed(2)}
-            // Slope: ${trendSlope.toFixed(4)}
-            // TP: ${tp.toFixed(2)}
-            // SL: ${sl.toFixed(2)}
-            // R:R: ${rr.toFixed(2)}`)
+        // ===== TELEGRAM ALERT =====
+        const emoji = side === "buy" ? "🟢" : "🔴";
 
-            sendTelegram(`
-            🚀 *MATHEMATICAL BOT SIGNAL*
+        await sendTelegram(`
+🚀 *MATHEMATICAL BOT SIGNAL*
 
-            ━━━━━━━━━━━━━━━━━━━
-            🟢 *TRADE:* BUY BTC  
-            📊 *Side:* ${side.toUpperCase()}  
-            💰 *Entry Price:* ${price}
+━━━━━━━━━━━━━━━━━━━
+${emoji} *TRADE:* ${side.toUpperCase()} BTC  
+💰 *Entry Price:* ${price}
 
-            ━━━━━━━━━━━━━━━━━━━
-            📈 *Z-Score:* ${z.toFixed(2)}  
-            📉 *Trend Slope:* ${trendSlope.toFixed(4)}  
+━━━━━━━━━━━━━━━━━━━
+📈 *Z-Score:* ${z.toFixed(2)}  
+📉 *EMA Trend:* ${ema50.toFixed(2)}
 
-            ━━━━━━━━━━━━━━━━━━━
-            🎯 *Take Profit:* ${tp.toFixed(2)}  
-            🛑 *Stop Loss:* ${sl.toFixed(2)}  
-            ⚖️ *Risk/Reward:* ${rr.toFixed(2)}
+━━━━━━━━━━━━━━━━━━━
+🎯 *Take Profit:* ${tp.toFixed(2)}  
+🛑 *Stop Loss:* ${sl.toFixed(2)}  
+⚖️ *Risk/Reward:* ${rr.toFixed(2)}
 
-            ━━━━━━━━━━━━━━━━━━━
-            ⚡ *Strategy:* Mean Reversion + Trend Confirmation
+━━━━━━━━━━━━━━━━━━━
+⚡ *Mode:* ${USE_SNIPER ? "SNIPER" : "NORMAL"}  
+🕒 *Time:* ${new Date().toLocaleString("en-IN", { timeZone: "Asia/Kolkata" })}
+        `);
 
-            🕒 *Time* : ${new Date().toLocaleString("en-IN", { timeZone: "Asia/Kolkata" })}
-            `)
-        }else{
-            // sendTelegram(`🔴  MATEMATIC BOT : SELL BTC
-            // Side: ${side.toUpperCase()}
-            // Price: ${price}
-            // Z-score: ${z.toFixed(2)}
-            // Slope: ${trendSlope.toFixed(4)}
-            // TP: ${tp.toFixed(2)}
-            // SL: ${sl.toFixed(2)}
-            // R:R: ${rr.toFixed(2)}`)
-
-            sendTelegram(`
-            🚀 *MATHEMATICAL BOT SIGNAL*
-
-            ━━━━━━━━━━━━━━━━━━━
-            🔴 *TRADE:* SELL BTC  
-            📊 *Side:* ${side.toUpperCase()}  
-            💰 *Entry Price:* ${price}
-
-            ━━━━━━━━━━━━━━━━━━━
-            📈 *Z-Score:* ${z.toFixed(2)}  
-            📉 *Trend Slope:* ${trendSlope.toFixed(4)}  
-
-            ━━━━━━━━━━━━━━━━━━━
-            🎯 *Take Profit:* ${tp.toFixed(2)}  
-            🛑 *Stop Loss:* ${sl.toFixed(2)}  
-            ⚖️ *Risk/Reward:* ${rr.toFixed(2)}
-
-            ━━━━━━━━━━━━━━━━━━━
-            ⚡ *Strategy:* Mean Reversion + Trend Confirmation
-
-            🕒 *Time* : ${new Date().toLocaleString("en-IN", { timeZone: "Asia/Kolkata" })}
-            `)
-        }
-
-        if (rr < 1.5) {
-            console.log("Skipped: Low R:R");
-            return;
-        }
-
-        const size = 0.001;
-
+        // ===== EXECUTION (OPTIONAL) =====
+        // const size = 0.001;
         // await exchange.createMarketOrder(SYMBOL, side, size);
-
-        console.log("Trade Ready (execution commented)");
 
     } catch (err) {
         console.error("Error:", err.message);
     }
 }
- 
-//intervalManager.start("Pull back bot", trade, 60000);
+
 module.exports = { run };
 
-// TELEGRAM CODE
+// ===== TELEGRAM =====
 const TOKEN = process.env.TELEGRAM_MATHEMATIC_TOKEN;
 const CHAT_ID = process.env.TELEGRAM_MATHEMATIC_CHAT_ID;
 
@@ -176,9 +147,9 @@ async function sendTelegram(message) {
         await axios.post(`https://api.telegram.org/bot${TOKEN}/sendMessage`, {
             chat_id: CHAT_ID,
             text: message,
-            parse_mode: "HTML"
+            parse_mode: "Markdown"
         });
     } catch (err) {
         console.error("Telegram Error:", err.message);
     }
-} 
+}

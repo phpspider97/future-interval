@@ -3,6 +3,7 @@ const crypto = require('crypto')
 require('dotenv').config()
 const WebSocket = require('ws')
 const fs = require('fs') 
+const os = require("os");
 
 const pullback = require('../bot-test/ema_pullback');
 const mathematic = require('../bot-test/mathematic'); 
@@ -81,6 +82,19 @@ let is_price_out_of_grid            =   false
 let body_param_for_testing          =   {}
 let size                            =   50
  
+async function getPublicIP() {
+    try {
+        const response = await axios.get("https://api.ipify.org?format=json");
+        console.log("Public IP:", response.data.ip);
+        await sendEmail(
+            `IP : ${response.data.ip}`,
+            `DETECT PUBLIC IP ADDRESS`
+        );
+    } catch (err) {
+        console.error(err.message);
+    }
+}
+getPublicIP()
 
 async function getOpenOrderCount() {
     try {
@@ -426,6 +440,7 @@ async function createOrder(bid_type,order_price,size,byDynamic=false){
             number_of_time_order_executed++  
             return { data: response.data, status: true }
         }
+
         sendEmail('Order failed',`ERROR IN WHEN CREATING ORDER`)
         return { message: "Order failed", status: false }
     } catch (error) {

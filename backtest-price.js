@@ -1,3 +1,57 @@
+// const axios = require('axios')
+// const crypto = require('crypto')
+// require('dotenv').config()
+
+// async function getOpenOrderCount() {
+//     try {
+//         const timestamp = Math.floor(Date.now() / 1000);
+
+//         const path = "/v2/orders";
+
+//         const signaturePayload = `GET${timestamp}${path}`;
+
+//         const signature = crypto
+//             .createHmac("sha256", process.env.GRID_WEB_SECRET)
+//             .update(signaturePayload)
+//             .digest("hex");
+
+//         const headers = {
+//             "api-key": process.env.GRID_WEB_KEY,
+//             "signature": signature,
+//             "timestamp": timestamp,
+//             "Accept": "application/json"
+//         };
+
+//         const response = await axios.get(
+//             `${process.env.API_URL}${path}`,
+//             { headers }
+//         );
+
+//         // only open/pending orders
+//         const openOrders = response.data.result.filter(order =>
+//             order.state === "open" ||
+//             order.state === "pending"
+//         );
+ 
+//         return response.data.meta.total_count
+
+//     } catch (error) {
+
+//         console.log(
+//             "OPEN ORDER COUNT ERROR:",
+//             error.response?.data || error.message
+//         );
+
+//         return 0;
+//     }
+// }
+// async function getData(){
+//     const totalOpenOrders = await getOpenOrderCount();
+//     console.log("TOTAL:", totalOpenOrders);
+// }
+// getData()
+// return 
+
 require("dotenv").config();
 const ccxt = require("ccxt");
 

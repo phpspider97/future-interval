@@ -79,8 +79,55 @@ let reconnectInterval               =   2000
 let order_in_progress               =   false 
 let is_price_out_of_grid            =   false
 let body_param_for_testing          =   {}
-let size                            =   10
+let size                            =   50
  
+
+async function getOpenOrderCount() {
+    try {
+        const timestamp = Math.floor(Date.now() / 1000);
+        const path = "/v2/orders";
+        const signaturePayload = `GET${timestamp}${path}`;
+        const signature = crypto
+            .createHmac("sha256", process.env.GRID_WEB_SECRET)
+            .update(signaturePayload)
+            .digest("hex");
+
+        const headers = {
+            "api-key": process.env.GRID_WEB_KEY,
+            "signature": signature,
+            "timestamp": timestamp,
+            "Accept": "application/json"
+        };
+
+        const response = await axios.get(
+            `${process.env.API_URL}${path}`,
+            { headers }
+        );
+        const openOrders = response.data.result.filter(order =>
+            order.state === "open" ||
+            order.state === "pending"
+        );
+        return response.data.meta.total_count
+    } catch (error) {
+        return 0;
+    }
+}
+
+setInterval(async () => {
+    try {
+        const totalOpenOrders = await getOpenOrderCount();
+        console.log('totalOpenOrders:', totalOpenOrders);
+        if (totalOpenOrders != 98) {
+            await sendEmail(
+                `CURRENT TOTAL COUNT IS : ${totalOpenOrders}`,
+                `ORDER COUNT MISMATCH ${98 - totalOpenOrders}`
+            );
+        }
+    } catch (error) {
+        console.error('Error in order count check:', error);
+    }
+}, 15 * 60 * 1000); // runs every 60 seconds
+
 function wsConnect() { 
     const WEBSOCKET_URL = SOCKET_URL
     const API_KEY = KEY
@@ -140,10 +187,12 @@ function wsConnect() {
 
                         if(!is_price_out_of_grid && order_at <= upper_price && order_at >= lower_price){  
                             //console.log('size____ : ',size,update_order_price)
+                            console.log('message : ',message)
                             await createOrder((side == 'buy')?'sell':'buy',update_order_price,size,true)
                         }
-                       // sendEmail('',`ONE ${side.toUpperCase()} SIDE STOP ORDER TRIGGERED AT ${order_at}`)
                     }
+                }else{
+                    //console.log(JSON.stringify(message))
                 } 
                 if(message.type == "v2/ticker"){
                     let candle_current_price = message?.close
@@ -273,6 +322,7 @@ async function setRangeLimitOrder() {
                 }
             }); 
         } 
+        sendEmail(`PAXG PRICE : ${round_of_current_price}`,`ENTRY POINT OF GRID`)
         console.log('given_price_range____',round_of_current_price, numberOfGrids, grid_spacing)
         //console.log('upper_price',upper_price)
         //console.log('lower_price',lower_price)
@@ -379,10 +429,10 @@ async function createOrder(bid_type,order_price,size,byDynamic=false){
         sendEmail('Order failed',`ERROR IN WHEN CREATING ORDER`)
         return { message: "Order failed", status: false }
     } catch (error) {
-        sendEmail(error.message +' '+JSON.stringify(body_param_for_testing),`ERROR IN WHEN CREATING ORDER`)
+        sendEmail(error.response.data || error.message +' '+JSON.stringify(body_param_for_testing),`ERROR IN WHEN CREATING ORDER`)
         //console.log('error : ',error) 
-        console.log('error 2 : ',error.response.data || error.message) 
-        console.log('body_param_for_testing___',body_param_for_testing) 
+        //console.log('error 2 : ',error.response.data || error.message) 
+        //console.log('body_param_for_testing___',body_param_for_testing) 
         total_error_count++ 
         order_in_progress = false;  
         return { message: error?.message, status: false }

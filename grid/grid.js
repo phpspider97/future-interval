@@ -429,7 +429,7 @@ async function createOrder(bid_type,order_price,size,byDynamic=false){
         sendEmail('Order failed',`ERROR IN WHEN CREATING ORDER`)
         return { message: "Order failed", status: false }
     } catch (error) {
-        sendEmail(error.response.data || error.message +' '+JSON.stringify(body_param_for_testing),`ERROR IN WHEN CREATING ORDER`)
+        sendEmail(JSON.stringify(error.response.data) || JSON.stringify(error.message) +' '+JSON.stringify(body_param_for_testing),`ERROR IN WHEN CREATING ORDER`)
         //console.log('error : ',error) 
         //console.log('error 2 : ',error.response.data || error.message) 
         //console.log('body_param_for_testing___',body_param_for_testing) 

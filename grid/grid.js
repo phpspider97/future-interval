@@ -98,35 +98,90 @@ getPublicIP()
 
 async function getOpenOrderCount() {
     try {
-        const timestamp = Math.floor(Date.now() / 1000);
-        const path = "/v2/orders";
-        const signaturePayload = `GET${timestamp}${path}`;
-        const signature = crypto
-            .createHmac("sha256", process.env.GRID_WEB_SECRET)
-            .update(signaturePayload)
-            .digest("hex");
 
-        const headers = {
-            "api-key": process.env.GRID_WEB_KEY,
-            "signature": signature,
-            "timestamp": timestamp,
-            "Accept": "application/json"
-        };
+        let allOrders = [];
+        let page = 1;
+        const pageSize = 100;
 
-        const response = await axios.get(
-            `${process.env.API_URL}${path}`,
-            { headers }
-        );
-        const openOrders = response.data.result.filter(order =>
+        while (true) {
+
+            const timestamp = Math.floor(Date.now() / 1000);
+
+            // Fetch orders page by page
+            const path = `/v2/orders?page_size=${pageSize}&page=${page}`;
+
+            const signaturePayload = `GET${timestamp}${path}`;
+
+            const signature = crypto
+                .createHmac("sha256", process.env.GRID_WEB_SECRET)
+                .update(signaturePayload)
+                .digest("hex");
+
+            const headers = {
+                "api-key": process.env.GRID_WEB_KEY,
+                "signature": signature,
+                "timestamp": timestamp,
+                "Accept": "application/json"
+            };
+
+            const response = await axios.get(
+                `${process.env.API_URL}${path}`,
+                { headers }
+            );
+
+            const orders = response.data.result;
+
+            if (!orders || orders.length === 0) {
+                break;
+            }
+
+            // Filter only PAXG orders
+            const paxgOrders = orders.filter(order =>
+                order.product_symbol === "PAXGUSD"
+            );
+
+            allOrders.push(...paxgOrders);
+
+            console.log(`Fetched page ${page} => ${paxgOrders.length} PAXG orders`);
+
+            // Stop if last page
+            if (orders.length < pageSize) {
+                break;
+            }
+
+            page++;
+        }
+
+        // Filter open + pending orders
+        const openOrders = allOrders.filter(order =>
             order.state === "open" ||
             order.state === "pending"
         );
-        return response.data.meta.total_count
+
+        // console.log("\n===== PAXG OPEN ORDERS =====\n");
+
+        // console.table(
+        //     openOrders.map(order => ({
+        //         ID: order.id,
+        //         Side: order.side,
+        //         Price: order.limit_price,
+        //         Size: order.size,
+        //         State: order.state,
+        //         Symbol: order.product_symbol
+        //     }))
+        // );
+
+        //console.log("Total PAXG Orders:", allOrders.length);
+        //console.log("PAXG ORDER COUNT:", openOrders.length);
+        return openOrders.length;
     } catch (error) {
+        console.log(
+            "ERROR:",
+            error.response?.data || error.message
+        );
         return 0;
     }
-}
-
+} 
 setInterval(async () => {
     try {
         const totalOpenOrders = await getOpenOrderCount();
@@ -140,7 +195,7 @@ setInterval(async () => {
     } catch (error) {
         console.error('Error in order count check:', error);
     }
-}, 15 * 60 * 1000); // runs every 60 seconds
+}, 15 * 60 * 1000); // runs every 15 min
 
 function wsConnect() { 
     const WEBSOCKET_URL = SOCKET_URL

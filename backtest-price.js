@@ -1,74 +1,40 @@
-// const axios = require('axios')
-// const crypto = require('crypto')
-// require('dotenv').config()
-
-// async function getOpenOrderCount() {
-//     try {
-//         const timestamp = Math.floor(Date.now() / 1000);
-
-//         const path = "/v2/orders";
-
-//         const signaturePayload = `GET${timestamp}${path}`;
-
-//         const signature = crypto
-//             .createHmac("sha256", process.env.GRID_WEB_SECRET)
-//             .update(signaturePayload)
-//             .digest("hex");
-
-//         const headers = {
-//             "api-key": process.env.GRID_WEB_KEY,
-//             "signature": signature,
-//             "timestamp": timestamp,
-//             "Accept": "application/json"
-//         };
-
-//         const response = await axios.get(
-//             `${process.env.API_URL}${path}`,
-//             { headers }
-//         );
-
-//         // only open/pending orders
-//         const openOrders = response.data.result.filter(order =>
-//             order.state === "open" ||
-//             order.state === "pending"
-//         );
- 
-//         return response.data.meta.total_count
-
-//     } catch (error) {
-
-//         console.log(
-//             "OPEN ORDER COUNT ERROR:",
-//             error.response?.data || error.message
-//         );
-
-//         return 0;
-//     }
-// }
-// async function getData(){
-//     const totalOpenOrders = await getOpenOrderCount();
-//     console.log("TOTAL:", totalOpenOrders);
-// }
-// getData()
-// return 
-
 require("dotenv").config();
 const ccxt = require("ccxt");
 
-const exchange = new ccxt.binance({ enableRateLimit: true });
+const exchange = new ccxt.binance({
+    enableRateLimit: true
+});
 
 const SYMBOL = "BTC/USDT";
 const TIMEFRAME = "1m";
 const DAYS = 30;
 
-// STRATEGY
-const STRIKE_DISTANCE = 1500;
-const SL_BUFFER = 500;
-const HOLD_MINUTES = 240; // 4 hours
+// ================= SETTINGS =================
 
-// ===== TIME HELPERS =====
+// STRANGLE SETTINGS
+const STRIKE_DISTANCE = 1100;
+const SL_BUFFER = 100;
+const HOLD_MINUTES = 240;
 
-// Time only (AM/PM)
+// DYNAMIC INTERVAL SETTINGS
+const INTERVAL_SIZE = 4; // hours
+const INTERVAL_SHIFT = 1; // shift by +1 hour
+
+// ================= COLORS =================
+
+const RED = "\x1b[31m";
+const GREEN = "\x1b[32m";
+const YELLOW = "\x1b[33m";
+const RESET = "\x1b[0m";
+
+// ================= HELPERS =================
+
+function color(value, condition) {
+    return condition
+        ? `${RED}${value}${RESET}`
+        : `${GREEN}${value}${RESET}`;
+}
+
 function timeOnly(ts) {
     return new Date(ts).toLocaleTimeString("en-IN", {
         timeZone: "Asia/Kolkata",
@@ -79,52 +45,102 @@ function timeOnly(ts) {
     });
 }
 
-// Correct IST hour
-function getHour(ts) {
-    const date = new Date(ts);
-    const ist = new Date(date.toLocaleString("en-US", {
+function getISTDate(ts) {
+    return new Date(ts).toLocaleDateString("en-IN", {
         timeZone: "Asia/Kolkata"
-    }));
+    });
+}
+
+function getWeekDay(ts) {
+    return new Date(ts).toLocaleDateString("en-IN", {
+        weekday: "long",
+        timeZone: "Asia/Kolkata"
+    });
+}
+
+function getHour(ts) {
+
+    const date = new Date(ts);
+
+    const ist = new Date(
+        date.toLocaleString("en-US", {
+            timeZone: "Asia/Kolkata"
+        })
+    );
+
     return ist.getHours();
 }
 
-// Interval mapping
+// ================= DYNAMIC INTERVAL =================
+
 function getInterval(hour) {
-    if (hour >= 0 && hour < 4) return "00-04";
-    if (hour >= 4 && hour < 8) return "04-08";
-    if (hour >= 8 && hour < 12) return "08-12";
-    if (hour >= 12 && hour < 16) return "12-16";
-    if (hour >= 16 && hour < 20) return "16-20";
-    return "20-24";
+
+    const shiftedHour =
+        (hour - INTERVAL_SHIFT + 24) % 24;
+
+    const blockStart =
+        Math.floor(shiftedHour / INTERVAL_SIZE)
+        * INTERVAL_SIZE;
+
+    const actualStart =
+        (blockStart + INTERVAL_SHIFT) % 24;
+
+    const actualEnd =
+        (actualStart + INTERVAL_SIZE) % 24;
+
+    return `${String(actualStart).padStart(2, "0")}-${String(actualEnd).padStart(2, "0")}`;
 }
 
-// Format interval → AM/PM
+function formatHour(hour) {
+
+    let h = parseInt(hour);
+
+    const ampm = h >= 12 ? "PM" : "AM";
+
+    h = h % 12 || 12;
+
+    return `${h}${ampm}`;
+}
+
 function formatInterval(interval) {
+
     const [start, end] = interval.split("-");
 
-    function fmt(h) {
-        let hour = parseInt(h);
-        let ampm = hour >= 12 ? "PM" : "AM";
-        hour = hour % 12 || 12;
-        return `${hour} ${ampm}`;
-    }
-
-    return `${fmt(start)} - ${fmt(end)}`;
+    return `${formatHour(start)}-${formatHour(end)}`;
 }
 
-// ===== FETCH DATA =====
+// ================= FETCH DATA =================
+
 async function fetchData() {
-    const since = Date.now() - DAYS * 24 * 60 * 60 * 1000;
+
+    const since =
+        Date.now() -
+        DAYS * 24 * 60 * 60 * 1000;
 
     let all = [];
+
     let fetchSince = since;
 
     while (true) {
-        const ohlcv = await exchange.fetchOHLCV(SYMBOL, TIMEFRAME, fetchSince, 1000);
-        if (ohlcv.length === 0) break;
+
+        const ohlcv =
+            await exchange.fetchOHLCV(
+                SYMBOL,
+                TIMEFRAME,
+                fetchSince,
+                1000
+            );
+
+        if (!ohlcv.length) break;
 
         all = all.concat(ohlcv);
-        fetchSince = ohlcv[ohlcv.length - 1][0] + 1;
+
+        fetchSince =
+            ohlcv[ohlcv.length - 1][0] + 1;
+
+        console.log(
+            `${YELLOW}Fetched:${RESET} ${all.length}`
+        );
 
         if (ohlcv.length < 1000) break;
     }
@@ -132,129 +148,362 @@ async function fetchData() {
     return all;
 }
 
-// ===== BACKTEST =====
-function runBacktest(data) {
-    let stats = {};
-    let trades = [];
-    let usedIntervals = new Set();
+// ================= BACKTEST =================
 
-    for (let i = 0; i < data.length - HOLD_MINUTES; i++) {
-        const [timestamp, , , , close] = data[i];
+function runBacktest(data) {
+
+    const trades = [];
+
+    const stats = {};
+
+    const usedIntervals = new Set();
+
+    for (
+        let i = 0;
+        i < data.length - HOLD_MINUTES;
+        i++
+    ) {
+
+        const candle = data[i];
+
+        const timestamp = candle[0];
+
+        const close = candle[4];
+
+        const day = getISTDate(timestamp);
+
+        const weekday = getWeekDay(timestamp);
 
         const hour = getHour(timestamp);
+
         const interval = getInterval(hour);
-        const day = new Date(timestamp).toLocaleDateString("en-IN");
 
-        const key = `${day}-${interval}`;
+        const uniqueKey =
+            `${day}-${interval}`;
 
-        // only 1 trade per interval per day
-        if (usedIntervals.has(key)) continue;
-        usedIntervals.add(key);
+        // ONE TRADE PER INTERVAL
+        if (usedIntervals.has(uniqueKey)) {
+            continue;
+        }
 
         const entryPrice = close;
-        const entryTime = timestamp;
 
-        const callSL = entryPrice + (STRIKE_DISTANCE - SL_BUFFER);
-        const putSL = entryPrice - (STRIKE_DISTANCE - SL_BUFFER);
+        const upperSL =
+            entryPrice +
+            (STRIKE_DISTANCE - SL_BUFFER);
+
+        const lowerSL =
+            entryPrice -
+            (STRIKE_DISTANCE - SL_BUFFER);
+
+        let result = "TIME EXIT";
 
         let exitPrice = close;
+
         let exitTime = timestamp;
-        let side = "TIME EXIT";
 
-        for (let j = 1; j <= HOLD_MINUTES; j++) {
-            const [ts, , high, low] = data[i + j];
+        let highest = close;
 
-            if (high >= callSL) {
-                exitPrice = callSL;
+        let lowest = close;
+
+        let maxUpMove = 0;
+
+        let maxDownMove = 0;
+
+        for (
+            let j = 1;
+            j <= HOLD_MINUTES;
+            j++
+        ) {
+
+            const next = data[i + j];
+
+            if (!next) break;
+
+            const ts = next[0];
+
+            const high = next[2];
+
+            const low = next[3];
+
+            highest =
+                Math.max(highest, high);
+
+            lowest =
+                Math.min(lowest, low);
+
+            const upMove =
+                high - entryPrice;
+
+            const downMove =
+                entryPrice - low;
+
+            maxUpMove =
+                Math.max(maxUpMove, upMove);
+
+            maxDownMove =
+                Math.max(maxDownMove, downMove);
+
+            // CALL SL
+            if (high >= upperSL) {
+
+                result = "CALL SL";
+
+                exitPrice = upperSL;
+
                 exitTime = ts;
-                side = "CALL SL";
+
                 break;
             }
 
-            if (low <= putSL) {
-                exitPrice = putSL;
+            // PUT SL
+            if (low <= lowerSL) {
+
+                result = "PUT SL";
+
+                exitPrice = lowerSL;
+
                 exitTime = ts;
-                side = "PUT SL";
+
                 break;
             }
 
+            // TIME EXIT
             if (j === HOLD_MINUTES) {
-                exitPrice = data[i + j][4];
+
+                exitPrice = next[4];
+
                 exitTime = ts;
             }
         }
 
+        usedIntervals.add(uniqueKey);
+
+        const totalRange =
+            highest - lowest;
+
         trades.push({
-            day,
-            interval: formatInterval(interval),
-            side,
-            entryPrice: entryPrice.toFixed(2),
-            entryTime: timeOnly(entryTime),
-            exitPrice: exitPrice.toFixed(2),
-            exitTime: timeOnly(exitTime)
+
+            Day: day,
+
+            Weekday: weekday,
+
+            Interval:
+                formatInterval(interval),
+
+            Entry:
+                entryPrice.toFixed(2),
+
+            Exit:
+                exitPrice.toFixed(2),
+
+            EntryTime:
+                timeOnly(timestamp),
+
+            ExitTime:
+                timeOnly(exitTime),
+
+            UpMove:
+                maxUpMove.toFixed(2),
+
+            DownMove:
+                maxDownMove.toFixed(2),
+
+            Range:
+                totalRange.toFixed(2),
+
+            Result: result,
+
+            Status:
+                result === "TIME EXIT"
+                    ? "SAFE"
+                    : "SL HIT"
         });
 
         if (!stats[interval]) {
-            stats[interval] = { total: 0, slHit: 0 };
+
+            stats[interval] = {
+                total: 0,
+                safe: 0,
+                slHit: 0,
+                avgRange: 0
+            };
         }
 
         stats[interval].total++;
-        if (side !== "TIME EXIT") stats[interval].slHit++;
+
+        stats[interval].avgRange += totalRange;
+
+        if (result === "TIME EXIT") {
+            stats[interval].safe++;
+        } else {
+            stats[interval].slHit++;
+        }
     }
 
     return { trades, stats };
 }
 
-// ===== MAIN =====
+// ================= MAIN =================
+
 (async () => {
-    console.log("⏳ Fetching data...");
+
+    console.log(
+        `${YELLOW}Fetching Data...${RESET}`
+    );
+
     const data = await fetchData();
 
-    console.log("⚙️ Running backtest...");
-    const { trades, stats } = runBacktest(data);
+    console.log(
+        `${YELLOW}Running Backtest...${RESET}`
+    );
 
-    // ===== DAY-WISE TABLE =====
-    console.log("\n📅 DAY-WISE TRADES:");
+    console.log(
+        `${GREEN}INTERVAL SIZE:${RESET} ${INTERVAL_SIZE} Hours`
+    );
 
-    let grouped = {};
+    console.log(
+        `${GREEN}INTERVAL SHIFT:${RESET} ${INTERVAL_SHIFT} Hour`
+    );
+
+    const { trades, stats } =
+        runBacktest(data);
+
+    // ================= TABLE =================
+
+    console.log(
+        `\n${YELLOW}DAY WISE TRADES${RESET}\n`
+    );
+
+    console.table(
+        trades.map(t => ({
+
+            Day: t.Day,
+
+            Weekday: t.Weekday,
+
+            Interval: t.Interval,
+
+            Entry: t.Entry,
+
+            Exit: t.Exit,
+
+            UpMove: t.UpMove,
+
+            DownMove: t.DownMove,
+
+            Range: t.Range,
+
+            Result: t.Result,
+
+            Status: t.Status
+        }))
+    );
+
+    // ================= COLOR MOVE ANALYSIS =================
+
+    console.log(
+        `\n${YELLOW}MOVE ANALYSIS${RESET}\n`
+    );
 
     trades.forEach(t => {
-        if (!grouped[t.day]) grouped[t.day] = [];
-        grouped[t.day].push({
-            Interval: t.interval,
-            Side: t.side,
-            Entry_Time: t.entryTime,
-            Entry_Price: t.entryPrice,
-            Exit_Time: t.exitTime,
-            Exit_Price: t.exitPrice,
-            Status: t.side === "TIME EXIT" ? "🟢 SAFE" : "🔴 SL HIT"
-        });
+
+        const up = color(
+            t.UpMove,
+            parseFloat(t.UpMove) > 1000
+        );
+
+        const down = color(
+            t.DownMove,
+            parseFloat(t.DownMove) > 1000
+        );
+
+        const range = color(
+            t.Range,
+            parseFloat(t.Range) > 2000
+        );
+
+        console.log(
+            `${t.Day} | ${t.Interval} | UP: ${up} | DOWN: ${down} | RANGE: ${range}`
+        );
     });
 
-    for (let day in grouped) {
-        console.log(`\n=== ${day} ===`);
-        console.table(grouped[day]);
-    }
+    // ================= STATS =================
 
-    // ===== INTERVAL STATS =====
     let result = [];
 
     for (let interval in stats) {
-        const { total, slHit } = stats[interval];
-        const prob = (slHit / total) * 100;
+
+        const s = stats[interval];
+
+        const safeProb =
+            (
+                (s.safe / s.total) * 100
+            ).toFixed(2);
+
+        const slProb =
+            (
+                (s.slHit / s.total) * 100
+            ).toFixed(2);
+
+        const avgRange =
+            (
+                s.avgRange / s.total
+            ).toFixed(2);
 
         result.push({
-            Interval: formatInterval(interval),
-            Trades: total,
-            SL_Hit: slHit,
-            SL_Probability: prob.toFixed(2) + "%"
+
+            Interval:
+                formatInterval(interval),
+
+            Trades: s.total,
+
+            SAFE: s.safe,
+
+            SL_HIT: s.slHit,
+
+            SAFE_Prob:
+                `${safeProb}%`,
+
+            SL_Prob:
+                `${slProb}%`,
+
+            Avg_Range: avgRange
         });
     }
 
-    result.sort((a, b) => parseFloat(a.SL_Probability) - parseFloat(b.SL_Probability));
+    result.sort(
+        (a, b) =>
+            parseFloat(b.SAFE_Prob) -
+            parseFloat(a.SAFE_Prob)
+    );
 
-    console.log("\n🎯 INTERVAL PERFORMANCE:");
+    // ================= PERFORMANCE =================
+
+    console.log(
+        `\n${YELLOW}INTERVAL PERFORMANCE${RESET}\n`
+    );
+
     console.table(result);
 
-    console.log(`\n✅ TOTAL TRADES: ${trades.length}`);
+    // ================= BEST =================
+
+    const best = result[0];
+
+    console.log(
+        `\n${GREEN}BEST INTERVAL:${RESET} ${best.Interval}`
+    );
+
+    console.log(
+        `${GREEN}SAFE PROBABILITY:${RESET} ${best.SAFE_Prob}`
+    );
+
+    console.log(
+        `${GREEN}AVERAGE RANGE:${RESET} ${best.Avg_Range}`
+    );
+
+    console.log(
+        `\n${YELLOW}TOTAL TRADES:${RESET} ${trades.length}`
+    );
+
 })();

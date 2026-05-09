@@ -72,6 +72,7 @@ let upper_price                     =   0
 let grid_spacing                    =   0
 let numberOfGrids                   =   100
 let profit_margin                   =   5
+let limit                           =   250
 let stoploss_both_side              =   0
 let total_error_count               =   0 
 let number_of_time_order_executed   =   0
@@ -101,9 +102,9 @@ async function getOpenOrderCount() {
 
         let allOrders = [];
         let page = 1;
-        const pageSize = 100;
+        const pageSize = 200;
 
-        while (true) {
+        //while (true) {
 
             const timestamp = Math.floor(Date.now() / 1000);
 
@@ -130,9 +131,9 @@ async function getOpenOrderCount() {
             );
 
             const orders = response.data.result;
-
+                console.log('orders : ',orders.length)
             if (!orders || orders.length === 0) {
-                break;
+               // break;
             }
 
             // Filter only PAXG orders
@@ -142,15 +143,15 @@ async function getOpenOrderCount() {
 
             allOrders.push(...paxgOrders);
 
-            console.log(`Fetched page ${page} => ${paxgOrders.length} PAXG orders`);
+            //console.log(`Fetched page ${page} => ${paxgOrders.length} PAXG orders`);
 
             // Stop if last page
             if (orders.length < pageSize) {
-                break;
+               // break;
             }
 
-            page++;
-        }
+           // page++;
+       // }
 
         // Filter open + pending orders
         const openOrders = allOrders.filter(order =>
@@ -159,18 +160,7 @@ async function getOpenOrderCount() {
         );
 
         // console.log("\n===== PAXG OPEN ORDERS =====\n");
-
-        // console.table(
-        //     openOrders.map(order => ({
-        //         ID: order.id,
-        //         Side: order.side,
-        //         Price: order.limit_price,
-        //         Size: order.size,
-        //         State: order.state,
-        //         Symbol: order.product_symbol
-        //     }))
-        // );
-
+  
         //console.log("Total PAXG Orders:", allOrders.length);
         //console.log("PAXG ORDER COUNT:", openOrders.length);
         return openOrders.length;
@@ -182,6 +172,7 @@ async function getOpenOrderCount() {
         return 0;
     }
 } 
+//getOpenOrderCount()
 setInterval(async () => {
     try {
         const totalOpenOrders = await getOpenOrderCount();
@@ -189,7 +180,7 @@ setInterval(async () => {
         if (totalOpenOrders != 98) {
             await sendEmail(
                 `CURRENT TOTAL COUNT IS : ${totalOpenOrders}`,
-                `ORDER COUNT MISMATCH ${98 - totalOpenOrders}`
+                `ORDER COUNT MISMATCH ${totalOpenOrders}`
             );
         }
     } catch (error) {
@@ -254,9 +245,7 @@ function wsConnect() {
 
                         //console.log('order_at___',order_at,side,update_order_price,is_price_out_of_grid,upper_price,lower_price)
 
-                        if(!is_price_out_of_grid && order_at <= upper_price && order_at >= lower_price){  
-                            //console.log('size____ : ',size,update_order_price)
-                            console.log('message : ',message)
+                        if(!is_price_out_of_grid && order_at <= upper_price && order_at >= lower_price){ 
                             await createOrder((side == 'buy')?'sell':'buy',update_order_price,size,true)
                         }
                     }
@@ -377,8 +366,8 @@ async function setRangeLimitOrder() {
         let round_of_current_price = roundedToHundred(current_price)  
         //let round_of_current_price =  Math.round(current_price)  
        
-        upper_price       =  round_of_current_price + 250
-        lower_price       =  round_of_current_price - 250
+        upper_price       =  round_of_current_price + limit
+        lower_price       =  round_of_current_price - limit
         grid_spacing      =  (upper_price - lower_price) / numberOfGrids ;
         //console.log('response___',response) 
         for (let i = 0; i < numberOfGrids; i++) {
@@ -391,7 +380,10 @@ async function setRangeLimitOrder() {
                 }
             }); 
         } 
-        sendEmail(`PAXG PRICE : ${round_of_current_price}`,`ENTRY POINT OF GRID`)
+        sendEmail(`PAXG PRICE : ${round_of_current_price}
+        UPPER LIMIT : ${upper_price}
+        LOWER LIMIT : ${lower_price}
+        `,`ENTRY POINT OF GRID`)
         console.log('given_price_range____',round_of_current_price, numberOfGrids, grid_spacing)
         //console.log('upper_price',upper_price)
         //console.log('lower_price',lower_price)

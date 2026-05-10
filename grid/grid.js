@@ -81,7 +81,7 @@ let reconnectInterval               =   2000
 let order_in_progress               =   false 
 let is_price_out_of_grid            =   false
 let body_param_for_testing          =   {}
-let size                            =   20
+let size                            =   25
  
 async function getPublicIP() {
     try {

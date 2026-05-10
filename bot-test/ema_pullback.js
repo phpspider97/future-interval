@@ -661,12 +661,12 @@ async function run() {
 
             else {
 
-                console.log(
-                    `⚪ NO SIGNAL -> ${SYMBOL} | ` +
-                    `Price: ${price.toFixed(2)} | ` +
-                    `Slope: ${slope.toFixed(4)} | ` +
-                    `ADX: ${adxVal.toFixed(2)}`
-                );
+                // console.log(
+                //     `⚪ NO SIGNAL -> ${SYMBOL} | ` +
+                //     `Price: ${price.toFixed(2)} | ` +
+                //     `Slope: ${slope.toFixed(4)} | ` +
+                //     `ADX: ${adxVal.toFixed(2)}`
+                // );
             }
 
         } catch (err) {

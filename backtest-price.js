@@ -12,13 +12,13 @@ const DAYS = 30;
 // ================= SETTINGS =================
 
 // STRANGLE SETTINGS
-const STRIKE_DISTANCE = 1100;
-const SL_BUFFER = 100;
+const STRIKE_DISTANCE = 1400;
+const SL_BUFFER = 400;
 const HOLD_MINUTES = 240;
 
 // DYNAMIC INTERVAL SETTINGS
-const INTERVAL_SIZE = 4; // hours
-const INTERVAL_SHIFT = 1; // shift by +1 hour
+const INTERVAL_SIZE = 6; // hours
+const INTERVAL_SHIFT = 0; // shift by +1 hour
 
 // ================= COLORS =================
 

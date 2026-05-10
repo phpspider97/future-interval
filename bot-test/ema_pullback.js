@@ -279,8 +279,8 @@ const axios = require("axios");
 const ccxt = require("ccxt");
 const ti = require("technicalindicators");
 const crypto = require("crypto");
-const API_KEY     =   process.env.TEST_API_KEY
-const API_SECRET  =   process.env.TEST_API_SECRET
+const API_KEY     =   process.env.GRID_WEB_KEY
+const API_SECRET  =   process.env.GRID_WEB_SECRET
 
 
 const exchange = new ccxt.delta({
@@ -288,14 +288,14 @@ const exchange = new ccxt.delta({
     secret: API_SECRET,
     enableRateLimit: true,
     urls: {
-        // api: {
-        //     public: "https://api.india.delta.exchange",
-        //     private: "https://api.india.delta.exchange",
-        // }
         api: {
-            public: "https://cdn-ind.testnet.deltaex.org",
-            private: "https://cdn-ind.testnet.deltaex.org",
+            public: "https://api.india.delta.exchange",
+            private: "https://api.india.delta.exchange",
         }
+        // api: {
+        //     public: "https://cdn-ind.testnet.deltaex.org",
+        //     private: "https://cdn-ind.testnet.deltaex.org",
+        // }
     }
 });
 
@@ -307,14 +307,21 @@ const SYMBOLS = [
     "BTCUSD",
     "ETHUSD",
     "SOLUSD",
-    "PAXGUSD",
-    "ONDOUSD",
+    "BNBUSD",
     "XRPUSD",
-    "ADAUSD",
+    "PAXGUSD",
+    "AVAXUSD",
     "DOGEUSD",
-    "1000SHIBUSD",
-    "ADAUSD",
-    "NVDAXUSD"
+    "LINKUSD",
+    "ADAUSD", 
+    "LTCUSD", 
+    "TRXUSD",
+    "NEARUSD",
+    "APTUSD",
+    "ARBUSD",
+    "OPUSD",
+    "SUIUSD",
+    "INJUSD"
 ];
 //const SYMBOLS = ["BTCUSD", "ETHUSD", "SOLUSD", "SLVONUSD"];
 
@@ -654,12 +661,12 @@ async function run() {
 
             else {
 
-                // console.log(
-                //     `⚪ NO SIGNAL -> ${SYMBOL} | ` +
-                //     `Price: ${price.toFixed(2)} | ` +
-                //     `Slope: ${slope.toFixed(4)} | ` +
-                //     `ADX: ${adxVal.toFixed(2)}`
-                // );
+                console.log(
+                    `⚪ NO SIGNAL -> ${SYMBOL} | ` +
+                    `Price: ${price.toFixed(2)} | ` +
+                    `Slope: ${slope.toFixed(4)} | ` +
+                    `ADX: ${adxVal.toFixed(2)}`
+                );
             }
 
         } catch (err) {

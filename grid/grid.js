@@ -37,7 +37,6 @@ const gridEmitter = new EventEmitter()
 const lastSentTimestamps = {}
 const THROTTLE_INTERVAL_MS = 60 * 1000
 async function sendEmail(message='NA',subject="NA"){
-    return true
     try{
         const now = Date.now();
         const subjectKey = subject.trim().toLowerCase();

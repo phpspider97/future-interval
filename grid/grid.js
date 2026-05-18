@@ -8,7 +8,7 @@ const os = require("os");
 const discount_price_detector = require('../bot-test/discount-price-detector')
 const intervalManager = require('../bot-test/intervalManager')
 const ema_pullback = require('../bot-test/ema_pullback')
-console.log('ema_pullback',ema_pullback.run)
+
 console.log(`%====================================================================%`);
 intervalManager.start('!=== DISCOUNT PRICE DETECTOR ===!',discount_price_detector.run,60000); 
 intervalManager.start('!=== EMA PULL BACK DETECTOR ===!',ema_pullback.run,60000); 
@@ -37,6 +37,7 @@ const gridEmitter = new EventEmitter()
 const lastSentTimestamps = {}
 const THROTTLE_INTERVAL_MS = 60 * 1000
 async function sendEmail(message='NA',subject="NA"){
+    return true
     try{
         const now = Date.now();
         const subjectKey = subject.trim().toLowerCase();

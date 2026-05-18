@@ -5,14 +5,15 @@ const WebSocket = require('ws')
 const fs = require('fs') 
 const os = require("os");
 
-const pullback = require('../bot-test/ema_pullback');
-const mathematic = require('../bot-test/mathematic'); 
-const intervalManager = require('../bot-test/intervalManager');
-
+const discount_price_detector = require('../bot-test/discount-price-detector')
+const intervalManager = require('../bot-test/intervalManager')
+const ema_pullback = require('../bot-test/ema_pullback')
+console.log('ema_pullback',ema_pullback.run)
 console.log(`%====================================================================%`);
-intervalManager.start('!=== EMA PULLBACK START ===!',pullback.run,60000);
-intervalManager.start('!=== MATHEMATIC BOT START ===!',mathematic.run,60000); 
+intervalManager.start('!=== DISCOUNT PRICE DETECTOR ===!',discount_price_detector.run,60000); 
+intervalManager.start('!=== EMA PULL BACK DETECTOR ===!',ema_pullback.run,60000); 
 console.log(`%====================================================================%`);
+ 
 
 // TELEGRAM
 const TOKEN = process.env.TELEGRAM_GRID_TOKEN;
@@ -173,20 +174,20 @@ async function getOpenOrderCount() {
     }
 } 
 //getOpenOrderCount()
-setInterval(async () => {
-    try {
-        const totalOpenOrders = await getOpenOrderCount();
-        console.log('totalOpenOrders:', totalOpenOrders);
-        if (totalOpenOrders != 98) {
-            await sendEmail(
-                `CURRENT TOTAL COUNT IS : ${totalOpenOrders}`,
-                `ORDER COUNT MISMATCH ${totalOpenOrders}`
-            );
-        }
-    } catch (error) {
-        console.error('Error in order count check:', error);
-    }
-}, 15 * 60 * 1000); // runs every 15 min
+// setInterval(async () => {
+//     try {
+//         const totalOpenOrders = await getOpenOrderCount();
+//         console.log('totalOpenOrders:', totalOpenOrders);
+//         if (totalOpenOrders != 98) {
+//             await sendEmail(
+//                 `CURRENT TOTAL COUNT IS : ${totalOpenOrders}`,
+//                 `ORDER COUNT MISMATCH ${totalOpenOrders}`
+//             );
+//         }
+//     } catch (error) {
+//         console.error('Error in order count check:', error);
+//     }
+// }, 15 * 60 * 1000); 
 
 function wsConnect() { 
     const WEBSOCKET_URL = SOCKET_URL
@@ -567,7 +568,7 @@ gridEmitter.on("grid_start", async () => {
 
 gridEmitter.on("grid_stop", async () => { 
     total_error_count = 0
-    await cancelAllOpenOrder() 
+    //await cancelAllOpenOrder() 
     fs.writeFileSync('./grid/orderInfo.json', '', 'utf8')
     sendEmail('',`BOT STOP BUTTON PRESSED`)
     is_live = false 

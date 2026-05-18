@@ -1,131 +1,91 @@
 require("dotenv").config();
+
 const ccxt = require("ccxt");
 
-const exchange = new ccxt.binance({ enableRateLimit: true });
+const API_KEY     =   process.env.GRID_WEB_KEY
+const API_SECRET  =   process.env.GRID_WEB_SECRET
 
-const SYMBOL = "BTC/USDT";
-const TIMEFRAME = "1m";
-const DAYS = 30;
+const exchange = new ccxt.delta({
+    apiKey: API_KEY,
+    secret: API_SECRET,
+    enableRateLimit: true,
+    urls: {
+        api: {
+            public: "https://api.india.delta.exchange",
+            private: "https://api.india.delta.exchange",
+        }
+    }
+});
 
-// STRATEGY SETTINGS
-const STRIKE_DISTANCE = 1000;
-const SL_BUFFER = 300;
-const HOLD_MINUTES = 240; // 4 hours
+const symbols = [
+    "BTCUSD",
+    "ETHUSD",
+    "PAXGUSD",
+    "SLVONUSD",
+];
 
-// ===== TIME HELPERS =====
-function getHour(ts) {
-    return parseInt(new Date(ts).toLocaleString("en-IN", {
-        timeZone: "Asia/Kolkata",
-        hour: "2-digit",
-        hour12: false
-    }));
-}
+async function getDiscountData(symbol) {
 
-function getInterval(hour) {
-    if (hour < 4) return "00-04";
-    if (hour < 8) return "04-08";
-    if (hour < 12) return "08-12";
-    if (hour < 16) return "12-16";
-    if (hour < 20) return "16-20";
-    return "20-24";
-}
+    const candles = await exchange.fetchOHLCV(symbol, '15m', undefined, 100);
 
-// ===== FETCH DATA =====
-async function fetchData() {
-    const since = Date.now() - DAYS * 24 * 60 * 60 * 1000;
+    const highs = candles.map(c => c[2]);
+    const lows = candles.map(c => c[3]);
 
-    let all = [];
-    let fetchSince = since;
+    const recentHigh = Math.max(...highs);
+    const recentLow = Math.min(...lows);
 
-    while (true) {
-        const ohlcv = await exchange.fetchOHLCV(SYMBOL, TIMEFRAME, fetchSince, 1000);
-        if (ohlcv.length === 0) break;
+    const equilibrium =
+        recentLow + ((recentHigh - recentLow) * 0.5);
 
-        all = all.concat(ohlcv);
-        fetchSince = ohlcv[ohlcv.length - 1][0] + 1;
-
-        if (ohlcv.length < 1000) break;
+    const ticker = await exchange.fetchTicker(symbol);
+    const price = ticker.last;
+    
+    let discount_buffer = 0
+    if(symbol == 'BTCUSD'){
+        discount_buffer = 200
+    }else if(symbol == 'ETHUSD'){
+        discount_buffer = 20
+    }else if(symbol == 'PAXGUSD'){
+        discount_buffer = 10
+    }else if(symbol == 'SLVONUSD'){
+        discount_buffer = 1
     }
 
-    return all;
+    const inDiscount = Math.round(price) <= Math.round(recentLow+discount_buffer);
+
+    return {
+        Symbol: symbol,
+        Price: Math.round(price),
+        High: Math.round(recentHigh),
+        Equilibrium: Math.round(equilibrium),
+        Low: Math.round(recentLow),
+        DiscountBuffer: Math.round(recentLow+discount_buffer),
+        Discount: inDiscount,
+        Time: new Date().toLocaleString("en-IN", {timeZone: "Asia/Kolkata"})
+    };
 }
 
-// ===== BACKTEST =====
-function runBacktest(data) {
-    let stats = {};
-    let usedIntervals = new Set();
-    let totalTrades = 0;
+async function main() {
 
-    for (let i = 0; i < data.length - HOLD_MINUTES; i++) {
-        const [timestamp, , , , close] = data[i];
+    try {
 
-        const hour = getHour(timestamp);
-        const interval = getInterval(hour);
-        const day = new Date(timestamp).toDateString();
+        const tableData = [];
 
-        const key = `${day}-${interval}`;
+        for (const symbol of symbols) {
 
-        // ✅ only 1 trade per interval per day
-        if (usedIntervals.has(key)) continue;
-        usedIntervals.add(key);
+            const data = await getDiscountData(symbol);
 
-        const entryPrice = close;
-
-        const callSL = entryPrice + (STRIKE_DISTANCE - SL_BUFFER);
-        const putSL = entryPrice - (STRIKE_DISTANCE - SL_BUFFER);
-
-        let slHit = false;
-
-        // check next 4 hours
-        for (let j = 1; j <= HOLD_MINUTES; j++) {
-            const [, , high, low] = data[i + j];
-
-            if (high >= callSL || low <= putSL) {
-                slHit = true;
-                break;
-            }
+            tableData.push(data);
         }
 
-        if (!stats[interval]) {
-            stats[interval] = { total: 0, slHit: 0 };
-        }
+        console.clear();
 
-        stats[interval].total++;
-        totalTrades++;
+        console.table(tableData);
 
-        if (slHit) stats[interval].slHit++;
+    } catch (err) {
+
+        console.log("ERROR:", err.message);
     }
-
-    return { stats, totalTrades };
 }
-
-// ===== MAIN =====
-(async () => {
-    console.log("⏳ Fetching data...");
-    const data = await fetchData();
-
-    console.log("⚙️ Running realistic backtest...");
-    const { stats, totalTrades } = runBacktest(data);
-
-    let result = [];
-
-    for (let interval in stats) {
-        const { total, slHit } = stats[interval];
-        const prob = (slHit / total) * 100;
-
-        result.push({
-            Interval: interval,
-            Trades: total,
-            SL_Hit: slHit,
-            SL_Probability: prob.toFixed(2) + "%"
-        });
-    }
-
-    // sort safest first
-    result.sort((a, b) => parseFloat(a.SL_Probability) - parseFloat(b.SL_Probability));
-
-    console.log("\n🎯 BEST INTERVALS (REALISTIC):");
-    console.table(result);
-
-    console.log(`\n✅ TOTAL TRADES (30 DAYS): ${totalTrades}`);
-})();
+main()
+setInterval(main, 1 * 60 * 1000)

@@ -155,8 +155,8 @@ ${new Date().toLocaleString("en-IN", {
 
 async function run() {
 
-    console.clear();
-    process.stdout.write('\x1Bc');
+    //console.clear();
+    //process.stdout.write('\x1Bc');
 
     if (isRunning) return;
 
@@ -170,7 +170,7 @@ async function run() {
 
         //console.clear();
         //process.stdout.write('\x1Bc');
-        console.table(tableData);
+        //console.table(tableData);
 
     } catch (err) {
 

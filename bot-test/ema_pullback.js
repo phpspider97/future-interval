@@ -233,9 +233,9 @@ async function processSymbol(symbol) {
 
         if (!signal) {
 
-            console.log(
-                `${symbol} → No Signal`
-            );
+            // console.log(
+            //     `${symbol} → No Signal`
+            // );
 
             return;
         }

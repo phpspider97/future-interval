@@ -299,11 +299,11 @@ ${sideEmoji} EMA PULLBACK SIGNAL
 }
 
 async function run() {
-    console.clear()
-    console.log(
-        "\nChecking Market:",
-        new Date().toLocaleTimeString()
-    );
+    // console.clear()
+    // console.log(
+    //     "\nChecking Market:",
+    //     new Date().toLocaleTimeString()
+    // );
 
     for (const symbol of SYMBOLS) {
 
@@ -318,8 +318,6 @@ function sleep(ms) {
         setTimeout(resolve, ms)
     );
 }
-
-console.log("🚀 EMA Pullback Bot Started");
 
 // Run immediately
 run();

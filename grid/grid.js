@@ -5,16 +5,6 @@ const WebSocket = require('ws')
 const fs = require('fs') 
 const os = require("os");
 
-const discount_price_detector = require('../bot-test/discount-price-detector')
-const intervalManager = require('../bot-test/intervalManager')
-const ema_pullback = require('../bot-test/ema_pullback')
-
-console.log(`%====================================================================%`);
-intervalManager.start('!=== DISCOUNT PRICE DETECTOR ===!',discount_price_detector.run,60000); 
-intervalManager.start('!=== EMA PULL BACK DETECTOR ===!',ema_pullback.run,60000); 
-console.log(`%====================================================================%`);
- 
-
 // TELEGRAM
 const TOKEN = process.env.TELEGRAM_GRID_TOKEN;
 const CHAT_ID = process.env.TELEGRAM_GRID_CHAT_ID;

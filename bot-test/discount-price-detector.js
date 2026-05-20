@@ -168,9 +168,9 @@ async function run() {
             symbols.map(symbol => getDiscountData(symbol))
         );
 
-        //console.clear();
-        //process.stdout.write('\x1Bc');
-        //console.table(tableData);
+        // console.clear();
+        // process.stdout.write('\x1Bc');
+        // console.table(tableData);
 
     } catch (err) {
 

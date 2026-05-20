@@ -2,6 +2,18 @@ const express = require("express");
 const http = require("http");
 const { Server } = require("socket.io");
 const path = require("path"); 
+
+const discount_price_detector = require('./bot-test/discount-price-detector')
+const intervalManager = require('./bot-test/intervalManager')
+const ema_pullback = require('./bot-test/ema_pullback')
+
+console.log(`%====================================================================%`);
+intervalManager.start('!=== DISCOUNT PRICE DETECTOR ===!',discount_price_detector.run,60000); 
+intervalManager.start('!=== EMA PULL BACK DETECTOR ===!',ema_pullback.run,60000); 
+console.log(`%====================================================================%`);
+return true
+
+
 // const { futureEmitter } = require("./future/future"); 
 // const { optionEmitter } = require("./option/option"); 
 const { gridEmitter } = require("./grid/grid"); 

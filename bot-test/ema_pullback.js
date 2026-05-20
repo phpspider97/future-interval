@@ -4,8 +4,35 @@ const ccxt = require("ccxt");
 const ti = require("technicalindicators");
 const axios = require("axios");
 
-const API_KEY     =   process.env.GRID_WEB_KEY
-const API_SECRET  =   process.env.GRID_WEB_SECRET
+const API_KEY = process.env.GRID_WEB_KEY;
+const API_SECRET = process.env.GRID_WEB_SECRET;
+
+// ======================================
+// CONFIG
+// ======================================
+
+const TIMEFRAME = "15m";
+
+const EMA_FAST = 9;
+const EMA_SLOW = 21;
+
+const CHECK_INTERVAL = 30 * 1000;
+
+// STOP LOSS BUFFER %
+const SL_BUFFER_PERCENT = 0.15;
+
+// SWING LOOKBACK
+const SWING_LOOKBACK = 20;
+
+const SYMBOLS = [
+    "BTCUSD",
+    "ETHUSD",
+    "PAXGUSD",
+];
+
+// ======================================
+// DELTA EXCHANGE
+// ======================================
 
 const exchange = new ccxt.delta({
     apiKey: API_KEY,
@@ -16,311 +43,385 @@ const exchange = new ccxt.delta({
             public: "https://api.india.delta.exchange",
             private: "https://api.india.delta.exchange",
         }
-        // api: {
-        //     public: "https://cdn-ind.testnet.deltaex.org",
-        //     private: "https://cdn-ind.testnet.deltaex.org",
-        // }
     }
 });
 
-const SYMBOLS = [
-    "BTCUSD",
-    "ETHUSD",
-    "SOLUSD",
-    "BNBUSD",
-    "XRPUSD",
-    "PAXGUSD",
-    "AVAXUSD",
-    "DOGEUSD",
-    "LINKUSD",
-    "ADAUSD", 
-    "LTCUSD", 
-    "TRXUSD",
-    "NEARUSD",
-    "APTUSD",
-    "ARBUSD",
-    "OPUSD",
-    "SUIUSD",
-    "INJUSD"
-];
+// ======================================
+// STORE LAST SIGNAL
+// ======================================
 
-const TIMEFRAME = "15m";
+const lastSignal = {};
 
-const EMA_FAST = 9;
-const EMA_SLOW = 21;
+// ======================================
+// TABLE DATA
+// ======================================
 
-const RR = 2;
+const tableData = [];
 
-const EMA_DISTANCE_FILTER = 0.15;
-
-const activeSignals = {};
-
-// ======================
+// ======================================
 // TELEGRAM
-// ======================
+// ======================================
 
 const TOKEN = process.env.TELEGRAM_EMA_PULLBACK_TOKEN;
 const CHAT_ID = process.env.TELEGRAM_EMA_PULLBACK_CHAT_ID;
 
-async function sendTelegramMessage(message) {
+// ======================================
+// TELEGRAM ALERT
+// ======================================
+
+async function sendTelegram(message) {
+
     try {
+
         await axios.post(
             `https://api.telegram.org/bot${TOKEN}/sendMessage`,
             {
                 chat_id: CHAT_ID,
                 text: message,
-                parse_mode: "Markdown"
+                parse_mode: "HTML"
             }
         );
-    } catch (err) {
-        console.log("Telegram Error:", err.message);
-    }
-}
-
-async function fetchCandles(symbol) {
-
-    const ohlcv = await exchange.fetchOHLCV(
-        symbol,
-        TIMEFRAME,
-        undefined,
-        200
-    );
-
-    return ohlcv.map(c => ({
-        time: c[0],
-        open: c[1],
-        high: c[2],
-        low: c[3],
-        close: c[4],
-        volume: c[5]
-    }));
-}
-
-function calculateEMA(data, period) {
-
-    return ti.EMA.calculate({
-        period,
-        values: data
-    });
-}
-
-function getSignal(candles) {
-
-    const closes = candles.map(c => c.close);
-    const volumes = candles.map(c => c.volume);
-
-    const ema9 = calculateEMA(closes, EMA_FAST);
-    const ema21 = calculateEMA(closes, EMA_SLOW);
-
-    const latestClose = closes[closes.length - 1];
-
-    const latestVolume = volumes[volumes.length - 1];
-
-    const avgVolume =
-        volumes.slice(-20).reduce((a, b) => a + b, 0) / 20;
-
-    const currentEMA9 = ema9[ema9.length - 1];
-    const currentEMA21 = ema21[ema21.length - 1];
-
-    const previousEMA9 = ema9[ema9.length - 2];
-    const previousEMA21 = ema21[ema21.length - 2];
-
-    const lastCandle = candles[candles.length - 1];
-
-    // TREND FILTER
-    const emaDistance =
-        Math.abs(currentEMA9 - currentEMA21)
-        / currentEMA21 * 100;
-
-    if (emaDistance < EMA_DISTANCE_FILTER) {
-        return null;
-    }
-
-    // VOLUME FILTER
-    if (latestVolume < avgVolume) {
-        return null;
-    }
-
-    // CROSS
-    const bullishCross =
-        previousEMA9 < previousEMA21 &&
-        currentEMA9 > currentEMA21;
-
-    const bearishCross =
-        previousEMA9 > previousEMA21 &&
-        currentEMA9 < currentEMA21;
-
-    // PULLBACK
-    const longPullback =
-        latestClose <= currentEMA9 * 1.002;
-
-    const shortPullback =
-        latestClose >= currentEMA9 * 0.998;
-
-    // REJECTION CANDLE
-    const bullishReject =
-        lastCandle.close > lastCandle.open &&
-        lastCandle.low <= currentEMA9;
-
-    const bearishReject =
-        lastCandle.close < lastCandle.open &&
-        lastCandle.high >= currentEMA9;
-
-    // BUY
-    if (
-        bullishCross ||
-        (
-            currentEMA9 > currentEMA21 &&
-            longPullback &&
-            bullishReject
-        )
-    ) {
-
-        const swingLow =
-            Math.min(
-                ...candles.slice(-10).map(c => c.low)
-            );
-
-        return {
-            side: "BUY",
-            entry: latestClose,
-            sl: swingLow,
-            tp:
-                latestClose +
-                ((latestClose - swingLow) * RR),
-            ema9: currentEMA9,
-            ema21: currentEMA21
-        };
-    }
-
-    // SELL
-    if (
-        bearishCross ||
-        (
-            currentEMA9 < currentEMA21 &&
-            shortPullback &&
-            bearishReject
-        )
-    ) {
-
-        const swingHigh =
-            Math.max(
-                ...candles.slice(-10).map(c => c.high)
-            );
-
-        return {
-            side: "SELL",
-            entry: latestClose,
-            sl: swingHigh,
-            tp:
-                latestClose -
-                ((swingHigh - latestClose) * RR),
-            ema9: currentEMA9,
-            ema21: currentEMA21
-        };
-    }
-
-    return null;
-}
-
-async function processSymbol(symbol) {
-
-    try {
-
-        const candles = await fetchCandles(symbol);
-
-        const signal = getSignal(candles);
-
-        if (!signal) {
-
-            // console.log(
-            //     `${symbol} → No Signal`
-            // );
-
-            return;
-        }
-
-        // PREVENT DUPLICATE SIGNALS
-        const key =
-            `${symbol}_${signal.side}`;
-
-        if (activeSignals[key]) {
-            return;
-        }
-
-        activeSignals[key] = true;
-
-        setTimeout(() => {
-            delete activeSignals[key];
-        }, 1000 * 60 * 30);
-
-        const sideEmoji =
-        signal.side === "BUY"
-            ? "🟢"
-            : "🔴";
-    
-    const message = `
-${sideEmoji} EMA PULLBACK SIGNAL
-
-📌 Symbol: ${symbol}
-
-📈 Side: ${signal.side}
-
-💰 Entry: ${signal.entry.toFixed(2)}
-
-🛑 Stop Loss: ${signal.sl.toFixed(2)}
-
-🎯 Target: ${signal.tp.toFixed(2)}
-
-📊 EMA 9: ${signal.ema9.toFixed(2)}
-
-📊 EMA 21: ${signal.ema21.toFixed(2)}
-
-⏰ TF: ${TIMEFRAME}
-
-🕒 ${new Date().toLocaleString("en-IN", {
-    timeZone: "Asia/Kolkata"
-})}
-`;
-
-        console.clear();
-
-        console.log(message);
-
-        await sendTelegramMessage(message);
 
     } catch (err) {
 
         console.log(
-            `${symbol} Error:`,
+            "Telegram Error:",
             err.message
         );
     }
 }
 
-async function run() {
-    // console.clear()
-    // console.log(
-    //     "\nChecking Market:",
-    //     new Date().toLocaleTimeString()
-    // );
+// ======================================
+// GET SWING HIGH
+// ======================================
 
-    for (const symbol of SYMBOLS) {
+function getSwingHigh(highs) {
 
-        await processSymbol(symbol);
+    const recentHighs = highs.slice(-SWING_LOOKBACK);
 
-        await sleep(1000);
+    return Math.max(...recentHighs);
+}
+
+// ======================================
+// GET SWING LOW
+// ======================================
+
+function getSwingLow(lows) {
+
+    const recentLows = lows.slice(-SWING_LOOKBACK);
+
+    return Math.min(...recentLows);
+}
+
+// ======================================
+// CHECK SIGNAL
+// ======================================
+
+async function checkSignal(symbol) {
+
+    try {
+
+        // ======================================
+        // FETCH OHLCV
+        // ======================================
+
+        const candles = await exchange.fetchOHLCV(
+            symbol,
+            TIMEFRAME,
+            undefined,
+            100
+        );
+
+        const closePrices = candles.map(c => c[4]);
+        const highs = candles.map(c => c[2]);
+        const lows = candles.map(c => c[3]);
+
+        // ======================================
+        // EMA CALCULATION
+        // ======================================
+
+        const ema9 = ti.EMA.calculate({
+            period: EMA_FAST,
+            values: closePrices
+        });
+
+        const ema21 = ti.EMA.calculate({
+            period: EMA_SLOW,
+            values: closePrices
+        });
+
+        const currentEMA9 = ema9[ema9.length - 1];
+        const previousEMA9 = ema9[ema9.length - 2];
+
+        const currentEMA21 = ema21[ema21.length - 1];
+        const previousEMA21 = ema21[ema21.length - 2];
+
+        const currentPrice = closePrices[closePrices.length - 1];
+
+        // ======================================
+        // CROSS CONDITIONS
+        // ======================================
+
+        const bullishCross =
+            previousEMA9 <= previousEMA21 &&
+            currentEMA9 > currentEMA21;
+
+        const bearishCross =
+            previousEMA9 >= previousEMA21 &&
+            currentEMA9 < currentEMA21;
+
+        // ======================================
+        // DEFAULT VALUES
+        // ======================================
+
+        let signal = "NO SIGNAL";
+
+        let stopLoss = "-";
+        let takeProfit = "-";
+
+        const trend =
+            currentEMA9 > currentEMA21
+                ? "BULLISH"
+                : "BEARISH";
+
+        // ======================================
+        // BUY SIGNAL
+        // ======================================
+        if (
+            bullishCross &&
+            lastSignal[symbol] !== "BUY"
+        ) {
+
+            lastSignal[symbol] = "BUY";
+
+            signal = "BUY";
+
+            // ======================================
+            // SL BELOW EMA 21
+            // ======================================
+
+            stopLoss =
+                currentEMA21 -
+                (
+                    currentEMA21 *
+                    SL_BUFFER_PERCENT /
+                    100
+                );
+
+            // ======================================
+            // TP = SWING HIGH
+            // ======================================
+
+            takeProfit = getSwingHigh(highs);
+
+            const rr =
+                (
+                    (takeProfit - currentPrice) /
+                    (currentPrice - stopLoss)
+                ).toFixed(2);
+
+            const message = `
+🟢 <b>EMA BULLISH CROSS</b>
+
+<b>Symbol:</b> ${symbol}
+
+<b>Timeframe:</b> ${TIMEFRAME}
+
+<b>Entry:</b> ${currentPrice.toFixed(2)}
+
+<b>EMA 9:</b> ${currentEMA9.toFixed(2)}
+<b>EMA 21:</b> ${currentEMA21.toFixed(2)}
+
+<b>Stop Loss:</b> ${stopLoss.toFixed(2)}
+
+<b>Take Profit:</b> ${takeProfit.toFixed(2)}
+
+<b>Risk Reward:</b> 1:${rr}
+
+<b>Trend:</b> ${trend}
+
+<b>Signal:</b> BUY
+
+<b>Time:</b>
+${new Date().toLocaleString("en-IN", {
+    timeZone: "Asia/Kolkata"
+})}
+`;
+
+            console.log(`🟢 BUY ALERT => ${symbol}`);
+
+            await sendTelegram(message);
+        }
+
+        // ======================================
+        // SELL SIGNAL
+        // ======================================
+
+        if (
+            bearishCross &&
+            lastSignal[symbol] !== "SELL"
+        ) {
+
+            lastSignal[symbol] = "SELL";
+
+            signal = "SELL";
+
+            // ======================================
+            // SL ABOVE EMA 21
+            // ======================================
+
+            stopLoss =
+                currentEMA21 +
+                (
+                    currentEMA21 *
+                    SL_BUFFER_PERCENT /
+                    100
+                );
+
+            // ======================================
+            // TP = SWING LOW
+            // ======================================
+
+            takeProfit = getSwingLow(lows);
+
+            const rr =
+                (
+                    (currentPrice - takeProfit) /
+                    (stopLoss - currentPrice)
+                ).toFixed(2);
+
+            const message = `
+🔴 <b>EMA BEARISH CROSS</b>
+
+<b>Symbol:</b> ${symbol}
+
+<b>Timeframe:</b> ${TIMEFRAME}
+
+<b>Entry:</b> ${currentPrice.toFixed(2)}
+
+<b>EMA 9:</b> ${currentEMA9.toFixed(2)}
+<b>EMA 21:</b> ${currentEMA21.toFixed(2)}
+
+<b>Stop Loss:</b> ${stopLoss.toFixed(2)}
+
+<b>Take Profit:</b> ${takeProfit.toFixed(2)}
+
+<b>Risk Reward:</b> 1:${rr}
+
+<b>Trend:</b> ${trend}
+
+<b>Signal:</b> SELL
+
+<b>Time:</b>
+${new Date().toLocaleString("en-IN", {
+    timeZone: "Asia/Kolkata"
+})}
+`;
+
+            console.log(`🔴 SELL ALERT => ${symbol}`);
+
+            await sendTelegram(message);
+        }
+
+        // ======================================
+        // PUSH TABLE DATA
+        // ======================================
+
+        tableData.push({
+            Symbol: symbol,
+            Signal: signal,
+            Price: currentPrice.toFixed(2),
+            EMA9: currentEMA9.toFixed(2),
+            EMA21: currentEMA21.toFixed(2),
+            SL:
+                stopLoss === "-"
+                    ? "-"
+                    : stopLoss.toFixed(2),
+            TP:
+                takeProfit === "-"
+                    ? "-"
+                    : takeProfit.toFixed(2),
+            Trend: trend,
+            Timeframe: TIMEFRAME,
+            Time: new Date().toLocaleTimeString(
+                "en-IN",
+                {
+                    timeZone: "Asia/Kolkata"
+                }
+            )
+        });
+
+    } catch (error) {
+
+        console.log(
+            `${symbol} Error:`,
+            error.message
+        );
     }
 }
 
+// ======================================
+// SLEEP
+// ======================================
+
 function sleep(ms) {
+
     return new Promise(resolve =>
         setTimeout(resolve, ms)
     );
 }
 
-// Run immediately
-run();
+// ======================================
+// MAIN LOOP
+// ======================================
 
-//setInterval(run, 1000 * 60);
+async function run() {
+
+    console.log("=================================");
+    console.log(" EMA CROSS BOT STARTED ");
+    console.log("=================================\n");
+
+    while (true) {
+
+        try {
+
+            tableData.length = 0;
+
+            for (const symbol of SYMBOLS) {
+
+                await checkSignal(symbol);
+
+                await sleep(1000);
+            }
+
+            console.clear();
+
+            // console.log("=================================");
+            // console.log(" EMA 9 / EMA 21 LIVE SCANNER ");
+            // console.log("=================================\n");
+
+            // console.table(tableData);
+
+            // console.log(
+            //     `Next Scan In ${CHECK_INTERVAL / 1000} Seconds...\n`
+            // );
+
+            await sleep(CHECK_INTERVAL);
+
+        } catch (error) {
+
+            console.log(
+                "Main Loop Error:",
+                error.message
+            );
+
+            await sleep(5000);
+        }
+    }
+}
+
+// ======================================
+// START BOT
+// ======================================
+
 module.exports = { run };

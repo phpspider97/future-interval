@@ -5,20 +5,20 @@ const exchange = new ccxt.binance({
     enableRateLimit: true
 });
 
-const SYMBOL = "ETH/USDT";
+const SYMBOL = "BTC/USDT";
 const TIMEFRAME = "1m";
-const DAYS = 30;
+const DAYS = 60;
 
 // ================= SETTINGS =================
 
 // STRANGLE SETTINGS
-const STRIKE_DISTANCE = 100;
-const SL_BUFFER = 90;
-const HOLD_MINUTES = 240;
+const STRIKE_DISTANCE = 1500;
+const SL_BUFFER = 0;
 
 // DYNAMIC INTERVAL SETTINGS
-const INTERVAL_SIZE = 4; // hours
-const INTERVAL_SHIFT = 0; // shift by +1 hour
+const INTERVAL_SIZE = 6; // hours
+const INTERVAL_SHIFT = 3; // shift by +hour
+const HOLD_MINUTES = INTERVAL_SIZE*60;
 
 // ================= COLORS =================
 

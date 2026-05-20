@@ -377,9 +377,9 @@ function sleep(ms) {
 
 async function run() {
 
-    console.log("=================================");
-    console.log(" EMA CROSS BOT STARTED ");
-    console.log("=================================\n");
+    // console.log("=================================");
+    // console.log(" EMA CROSS BOT STARTED ");
+    // console.log("=================================\n");
 
     while (true) {
 

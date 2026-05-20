@@ -185,7 +185,7 @@ async function checkSignal(symbol) {
                 : "BEARISH";
 
         // ======================================
-        // BUY SIGNAL
+        // BUY SIGNAL 
         // ======================================
         if (
             bullishCross &&

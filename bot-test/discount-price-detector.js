@@ -70,15 +70,15 @@ async function getDiscountData(symbol) {
 
     let discountBuffer = 0;
 
-    if (symbol === 'BTCUSD') {
-        discountBuffer = 50;
-    } else if (symbol === 'ETHUSD') {
-        discountBuffer = 5;
-    } else if (symbol === 'PAXGUSD') {
-        discountBuffer = 10;
-    } else if (symbol === 'SLVONUSD') {
-        discountBuffer = 1;
-    }
+    // if (symbol === 'BTCUSD') {
+    //     discountBuffer = 50;
+    // } else if (symbol === 'ETHUSD') {
+    //     discountBuffer = 5;
+    // } else if (symbol === 'PAXGUSD') {
+    //     discountBuffer = 10;
+    // } else if (symbol === 'SLVONUSD') {
+    //     discountBuffer = 1;
+    // }
 
     // Near low price
     const nearLowPrice =
@@ -104,7 +104,7 @@ async function getDiscountData(symbol) {
         };
 
         const message = `
-🟢 <b>DISCOUNT ZONE ALERT</b>
+🟢 <b>(${symbolEmoji[symbol]}) ${symbol} DISCOUNT ZONE</b>
 
 ━━━━━━━━━━━━━━
 
@@ -143,7 +143,7 @@ ${new Date().toLocaleString("en-IN", {
         High: recentHigh,
         Equilibrium: equilibrium.toFixed(2),
         Low: recentLow,
-        DiscountBuffer: nearLowPrice,
+        //DiscountBuffer: nearLowPrice,
         Discount: inDiscount ? "YES" : "NO",
         AlertSent: alertState[symbol] ? "YES" : "NO",
         Time: new Date().toLocaleString(

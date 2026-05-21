@@ -221,7 +221,7 @@ async function checkSignal(symbol) {
                 ).toFixed(2);
 
             const message = `
-🟢 <b>EMA BULLISH CROSS</b>
+🟢 <b>${symbol} BULLISH CROSS</b>
 
 <b>Symbol:</b> ${symbol}
 
@@ -291,7 +291,7 @@ ${new Date().toLocaleString("en-IN", {
                 ).toFixed(2);
 
             const message = `
-🔴 <b>EMA BEARISH CROSS</b>
+🔴 <b>${symbol} BEARISH CROSS</b>
 
 <b>Symbol:</b> ${symbol}
 

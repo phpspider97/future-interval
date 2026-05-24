@@ -9,7 +9,7 @@ const ema_pullback = require('./bot-test/ema_pullback')
 
 console.log(`%====================================================================%`);
 intervalManager.start('!=== DISCOUNT PRICE DETECTOR ===!',discount_price_detector.run,60000); 
-intervalManager.start('!=== EMA PULL BACK DETECTOR ===!',ema_pullback.run,60000); 
+intervalManager.start('!=== EMA PULL BACK DETECTOR ===!',ema_pullback.run,15000); 
 console.log(`%====================================================================%`);
 return true
 

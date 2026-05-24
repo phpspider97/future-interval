@@ -424,6 +424,8 @@
 // // START BOT
 // // ======================================
 
+//==========================================================================================================================================
+
 require("dotenv").config();
 
 const ccxt = require("ccxt");
@@ -437,11 +439,15 @@ const axios = require("axios");
 const API_KEY = process.env.GRID_WEB_KEY;
 const API_SECRET = process.env.GRID_WEB_SECRET;
 
-const TELEGRAM_BOT_TOKEN =
-    process.env.TELEGRAM_BOT_TOKEN;
+// ======================================================
+// TELEGRAM
+// ======================================================
 
-const TELEGRAM_CHAT_ID =
-    process.env.TELEGRAM_CHAT_ID;
+const TELEGRAM_BOT =
+    process.env.TELEGRAM_EMA_PULLBACK_TOKEN;
+
+const CHAT_ID =
+    process.env.TELEGRAM_EMA_PULLBACK_CHAT_ID;
 
 // ======================================================
 // EXCHANGE
@@ -451,6 +457,9 @@ const exchange = new ccxt.delta({
     apiKey: API_KEY,
     secret: API_SECRET,
     enableRateLimit: true,
+    options: {
+        defaultType: "future"
+    },
     urls: {
         api: {
             public: "https://api.india.delta.exchange",
@@ -463,8 +472,13 @@ const exchange = new ccxt.delta({
 // CONFIG
 // ======================================================
 
-const SYMBOL = "BTCUSD";
-const TIMEFRAME = "5m";
+const SYMBOLS = [
+    "BTCUSD",
+    "ETHUSD",
+    "PAXGUSD"
+];
+
+const TIMEFRAME = "1m";
 
 const FAST_EMA = 21;
 const SLOW_EMA = 50;
@@ -472,10 +486,22 @@ const TREND_EMA = 200;
 
 const RSI_LENGTH = 14;
 
-const STOP_BUFFER_PERCENT = 0.3;
-const RISK_REWARD = 2;
+const VOLUME_MULTIPLIER = 1.2;
 
-const CHECK_INTERVAL = 15000;
+const STOP_BUFFER_PERCENT = 0.15;
+const RISK_REWARD = 1.5;
+
+const CHECK_INTERVAL = 30000;
+
+// ======================================================
+// ORDER SIZE
+// ======================================================
+
+const ORDER_SIZES = {
+    BTCUSD: 1,
+    ETHUSD: 2,
+    PAXGUSD: 1
+};
 
 // ======================================================
 // TELEGRAM
@@ -486,23 +512,19 @@ async function sendTelegramMessage(message) {
     try {
 
         const url =
-            `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`;
+            `https://api.telegram.org/bot${TELEGRAM_BOT}/sendMessage`;
 
         await axios.post(url, {
-            chat_id: TELEGRAM_CHAT_ID,
+            chat_id: CHAT_ID,
             text: message,
             parse_mode: "HTML"
         });
-
-        console.log(
-            "Telegram Alert Sent"
-        );
 
     } catch (err) {
 
         console.log(
             "Telegram Error:",
-            err.message
+            err.response?.data || err.message
         );
     }
 }
@@ -511,11 +533,11 @@ async function sendTelegramMessage(message) {
 // FETCH CANDLES
 // ======================================================
 
-async function getCandles() {
+async function getCandles(symbol) {
 
     const candles =
         await exchange.fetchOHLCV(
-            SYMBOL,
+            symbol,
             TIMEFRAME,
             undefined,
             300
@@ -532,6 +554,77 @@ async function getCandles() {
 }
 
 // ======================================================
+// GET POSITION
+// ======================================================
+
+async function hasOpenPosition(symbol) {
+
+    try {
+
+        const positions =
+            await exchange.fetchPositions([
+                symbol
+            ]);
+
+        const position =
+            positions.find(
+                p =>
+                    p.symbol === symbol &&
+                    Math.abs(
+                        Number(p.contracts)
+                    ) > 0
+            );
+
+        return !!position;
+
+    } catch (err) {
+
+        console.log(
+            `${symbol} Position Error:`,
+            err.message
+        );
+
+        return false;
+    }
+}
+
+// ======================================================
+// CREATE MARKET ORDER
+// ======================================================
+
+async function createOrder(
+    symbol,
+    side,
+    amount
+) {
+
+    try {
+
+        const order =
+            await exchange.createMarketOrder(
+                symbol,
+                side,
+                amount
+            );
+
+        console.log(
+            `${symbol} ${side} ORDER EXECUTED`
+        );
+
+        return order;
+
+    } catch (err) {
+
+        console.log(
+            `${symbol} Order Error:`,
+            err.message
+        );
+
+        return null;
+    }
+}
+
+// ======================================================
 // SIGNAL DETECTION
 // ======================================================
 
@@ -539,6 +632,9 @@ function detectSignal(candles) {
 
     const closes =
         candles.map(c => c.close);
+
+    const volumes =
+        candles.map(c => c.volume);
 
     // ==================================================
     // EMA
@@ -573,65 +669,114 @@ function detectSignal(candles) {
         });
 
     // ==================================================
-    // CURRENT VALUES
+    // LAST CLOSED CANDLE
+    // ==================================================
+
+    const lastCandle =
+        candles[candles.length - 2];
+
+    const currentPrice =
+        lastCandle.close;
+
+    const currentVolume =
+        lastCandle.volume;
+
+    // ==================================================
+    // AVG VOLUME
+    // ==================================================
+
+    const avgVolume =
+        volumes
+            .slice(-25)
+            .reduce((a, b) => a + b, 0) / 25;
+
+    // ==================================================
+    // INDICATORS
     // ==================================================
 
     const fastCurrent =
-        fastEMA[fastEMA.length - 1];
-
-    const fastPrevious =
         fastEMA[fastEMA.length - 2];
 
     const slowCurrent =
-        slowEMA[slowEMA.length - 1];
-
-    const slowPrevious =
         slowEMA[slowEMA.length - 2];
 
     const trendCurrent =
-        trendEMA[trendEMA.length - 1];
+        trendEMA[trendEMA.length - 2];
 
     const rsiCurrent =
-        rsi[rsi.length - 1];
-
-    const currentPrice =
-        closes[closes.length - 1];
+        rsi[rsi.length - 2];
 
     // ==================================================
-    // EMA CROSSOVER
-    // ==================================================
-
-    const bullCross =
-        fastPrevious < slowPrevious &&
-        fastCurrent > slowCurrent;
-
-    const bearCross =
-        fastPrevious > slowPrevious &&
-        fastCurrent < slowCurrent;
-
-    // ==================================================
-    // TREND FILTER
+    // TREND
     // ==================================================
 
     const bullishTrend =
-        fastCurrent > trendCurrent;
+        currentPrice > trendCurrent;
 
     const bearishTrend =
-        fastCurrent < trendCurrent;
+        currentPrice < trendCurrent;
 
     // ==================================================
-    // FINAL SIGNALS
+    // EMA DIRECTION
+    // ==================================================
+
+    const emaBullish =
+        fastCurrent > slowCurrent;
+
+    const emaBearish =
+        fastCurrent < slowCurrent;
+
+    // ==================================================
+    // PULLBACK
+    // ==================================================
+
+    const nearFastEMAForBuy =
+        currentPrice <= fastCurrent * 1.0015;
+
+    const nearFastEMAForSell =
+        currentPrice >= fastCurrent * 0.9985;
+
+    // ==================================================
+    // CANDLE
+    // ==================================================
+
+    const bullishCandle =
+        lastCandle.close > lastCandle.open;
+
+    const bearishCandle =
+        lastCandle.close < lastCandle.open;
+
+    // ==================================================
+    // VOLUME FILTER
+    // ==================================================
+
+    const highVolume =
+        currentVolume >
+        avgVolume * VOLUME_MULTIPLIER;
+
+    // ==================================================
+    // BUY
     // ==================================================
 
     const buySignal =
-        bullCross &&
         bullishTrend &&
-        rsiCurrent > 50;
+        emaBullish &&
+        nearFastEMAForBuy &&
+        bullishCandle &&
+        highVolume &&
+        rsiCurrent > 45;
+
+    // ==================================================
+    // SELL
+    // ==================================================
 
     const sellSignal =
-        bearCross &&
         bearishTrend &&
-        rsiCurrent < 50;
+        emaBearish &&
+        nearFastEMAForSell &&
+        bearishCandle &&
+        highVolume &&
+        rsiCurrent < 55;
 
     return {
         buySignal,
@@ -639,86 +784,64 @@ function detectSignal(candles) {
         currentPrice,
         fastCurrent,
         slowCurrent,
-        rsiCurrent
+        trendCurrent,
+        rsiCurrent,
+        currentVolume
     };
 }
 
 // ======================================================
-// ALERT STATE
+// LAST SIGNAL STATE
 // ======================================================
 
-let lastSignal = "";
+const lastSignals = {};
 
 // ======================================================
-// MAIN BOT
+// PROCESS SYMBOL
 // ======================================================
 
-async function run() {
+async function processSymbol(symbol) {
 
     try {
 
-        console.clear();
-
-        // console.log(
-        //     "================================="
-        // );
-
-        // console.log(
-        //     "BTC EMA ALERT BOT"
-        // );
-
-        // console.log(
-        //     "================================="
-        // );
-
-        // ==============================================
-        // FETCH MARKET DATA
-        // ==============================================
-
         const candles =
-            await getCandles();
-
-        // ==============================================
-        // SIGNALS
-        // ==============================================
+            await getCandles(symbol);
 
         const signal =
             detectSignal(candles);
 
-        // console.log(
-        //     `Price: ${signal.currentPrice}`
-        // );
+        // ==================================================
+        // SIGNAL TYPE
+        // ==================================================
 
-        // console.log(
-        //     `Fast EMA: ${signal.fastCurrent.toFixed(2)}`
-        // );
+        let signalType = "NONE";
 
-        // console.log(
-        //     `Slow EMA: ${signal.slowCurrent.toFixed(2)}`
-        // );
+        if (signal.buySignal) {
+            signalType = "BUY";
+        }
 
-        // console.log(
-        //     `RSI: ${signal.rsiCurrent.toFixed(2)}`
-        // );
+        if (signal.sellSignal) {
+            signalType = "SELL";
+        }
 
-        // ==============================================
-        // BUY SIGNAL
-        // ==============================================
+        // ==================================================
+        // POSITION CHECK
+        // ==================================================
+
+        //const hasPosition =  await hasOpenPosition(symbol);
+        const hasPosition = false;
+
+        // ==================================================
+        // BUY ORDER
+        // ==================================================
 
         if (
             signal.buySignal &&
-            lastSignal !== "BUY"
+            lastSignals[symbol] !== "BUY" &&
+            !hasPosition
         ) {
 
-            lastSignal = "BUY";
-
-            console.log(
-                "BUY SIGNAL DETECTED"
-            );
-
-            // ==========================================
-            // SL / TP
-            // ==========================================
+            lastSignals[symbol] = "BUY";
 
             const stopLoss =
                 signal.fastCurrent *
@@ -738,15 +861,25 @@ async function run() {
                     RISK_REWARD
                 );
 
-            // ==========================================
-            // TELEGRAM ALERT
-            // ==========================================
+            // ==============================================
+            // CREATE ORDER
+            // ==============================================
+
+            await createOrder(
+                symbol,
+                "buy",
+                ORDER_SIZES[symbol]
+            );
+
+            // ==============================================
+            // TELEGRAM
+            // ==============================================
 
             await sendTelegramMessage(
 
-`🚀 <b>BUY SIGNAL</b>
+`🚀 <b>BUY ORDER EXECUTED</b>
 
-📈 Symbol: ${SYMBOL}
+📈 Symbol: ${symbol}
 
 💰 Entry: ${signal.currentPrice}
 
@@ -754,34 +887,23 @@ async function run() {
 
 🎯 TP: ${takeProfit.toFixed(2)}
 
-⚡ EMA: ${FAST_EMA}/${SLOW_EMA}
-
 📊 RSI: ${signal.rsiCurrent.toFixed(2)}
 
 🕒 TF: ${TIMEFRAME}`
             );
-
-            return;
         }
 
-        // ==============================================
-        // SELL SIGNAL
-        // ==============================================
+        // ==================================================
+        // SELL ORDER
+        // ==================================================
 
         if (
             signal.sellSignal &&
-            lastSignal !== "SELL"
+            lastSignals[symbol] !== "SELL" &&
+            !hasPosition
         ) {
 
-            lastSignal = "SELL";
-
-            console.log(
-                "SELL SIGNAL DETECTED"
-            );
-
-            // ==========================================
-            // SL / TP
-            // ==========================================
+            lastSignals[symbol] = "SELL";
 
             const stopLoss =
                 signal.fastCurrent *
@@ -801,15 +923,25 @@ async function run() {
                     RISK_REWARD
                 );
 
-            // ==========================================
-            // TELEGRAM ALERT
-            // ==========================================
+            // ==============================================
+            // CREATE ORDER
+            // ==============================================
+
+            await createOrder(
+                symbol,
+                "sell",
+                ORDER_SIZES[symbol]
+            );
+
+            // ==============================================
+            // TELEGRAM
+            // ==============================================
 
             await sendTelegramMessage(
 
-`🔻 <b>SELL SIGNAL</b>
+`🔻 <b>SELL ORDER EXECUTED</b>
 
-📈 Symbol: ${SYMBOL}
+📈 Symbol: ${symbol}
 
 💰 Entry: ${signal.currentPrice}
 
@@ -817,82 +949,116 @@ async function run() {
 
 🎯 TP: ${takeProfit.toFixed(2)}
 
-⚡ EMA: ${FAST_EMA}/${SLOW_EMA}
-
 📊 RSI: ${signal.rsiCurrent.toFixed(2)}
 
 🕒 TF: ${TIMEFRAME}`
             );
-
-            return;
         }
 
-        // console.log(
-        //     "NO SIGNAL"
-        // );
+        // ==================================================
+        // RESET SIGNAL
+        // ==================================================
+
+        if (
+            !signal.buySignal &&
+            !signal.sellSignal
+        ) {
+
+            lastSignals[symbol] = "";
+        }
+
+        // ==================================================
+        // TABLE OUTPUT
+        // ==================================================
+
+        return {
+
+            Symbol: symbol,
+
+            Price:
+                signal.currentPrice.toFixed(2),
+
+            RSI:
+                signal.rsiCurrent.toFixed(2),
+
+            Signal:
+                signalType,
+
+            Position:
+                hasPosition
+                    ? "OPEN"
+                    : "NONE"
+        };
 
     } catch (err) {
 
-        console.log(
-            "BOT ERROR:"
-        );
+        return {
 
-        console.log(
-            err.message
-        );
+            Symbol: symbol,
 
-        await sendTelegramMessage(
+            Price: "ERROR",
 
-`❌ BOT ERROR
+            RSI: "-",
 
-${err.message}`
-        );
+            Signal: err.message,
+
+            Position: "-"
+        };
     }
+}
+
+// ======================================================
+// MAIN LOOP
+// ======================================================
+
+async function run() {
+
+    const tableData = [];
+
+    for (const symbol of SYMBOLS) {
+
+        const data =
+            await processSymbol(symbol);
+
+        tableData.push(data);
+    }
+
+    console.clear();
+
+    console.log(
+        "\nMULTI-ASSET SCALPING BOT\n"
+    );
+
+    //console.table(tableData);
+
+    console.log(
+        `Last Update: ${
+            new Date().toLocaleString()
+        }`
+    );
 }
 
 // ======================================================
 // START BOT
 // ======================================================
 
-// (async () => {
+(async () => {
 
-//     console.log(
-//         "STARTING BTC EMA ALERT BOT..."
-//     );
+    console.log(
+        "STARTING BOT..."
+    );
 
-//     // ==============================================
-//     // STARTUP ALERT
-//     // ==============================================
+    await sendTelegramMessage(
 
-//     await sendTelegramMessage(
+`🟢 SCALPING BOT STARTED
 
-// `🟢 BTC EMA ALERT BOT STARTED
+📈 Assets:
+${SYMBOLS.join(", ")}
 
-// 📈 Symbol: ${SYMBOL}
-
-// ⚡ EMA: ${FAST_EMA}/${SLOW_EMA}
-
-// 🕒 TF: ${TIMEFRAME}
-
-// 🚀 Bot Running Successfully`
-//     );
-
-//     // ==============================================
-//     // FIRST RUN
-//     // ==============================================
-
-//     await run();
-
-//     // ==============================================
-//     // LOOP
-//     // ==============================================
-
-//     setInterval(async () => {
-
-//         await run();
-
-//     }, CHECK_INTERVAL);
-
-// })();
+🕒 TF:
+${TIMEFRAME}`
+    );
+ 
+})();
 
 module.exports = { run };

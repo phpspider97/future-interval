@@ -1,502 +1,385 @@
 require("dotenv").config();
 
 const ccxt = require("ccxt");
-const ti = require("technicalindicators");
 
-// ======================================================
+// ============================================
+// CONFIG
+// ============================================
+
+const SYMBOL = "BTC/USDT";
+const TIMEFRAME = "30m";
+const DAYS = 30;
+
+// SESSION TIME
+const START_HOUR = 9;
+const START_MINUTE = 0;
+
+const END_HOUR = 10;
+const END_MINUTE = 0;
+
+// ============================================
 // EXCHANGE
-// ======================================================
+// ============================================
 
-const exchange = new ccxt.delta({
+const exchange = new ccxt.binance({
     enableRateLimit: true,
-    urls: {
-        api: {
-            public: "https://api.india.delta.exchange",
-            private: "https://api.india.delta.exchange",
-        }
+    options: {
+        defaultType: "future"
     }
 });
 
-// ======================================================
-// CONFIG
-// ======================================================
+// ============================================
+// HELPERS
+// ============================================
 
-const SYMBOL = "BTCUSD";
-const TIMEFRAME = "5m";
+function format(num) {
+    return Math.round(num).toLocaleString();
+}
 
-const FAST_EMA = 21;
-const SLOW_EMA = 50;
-const TREND_EMA = 200;
+function findNearestCandle(candles, targetTime) {
 
-const RSI_LENGTH = 14;
+    return candles.find(c => c[0] >= targetTime);
+}
 
-const STOP_BUFFER_PERCENT = 0.3;
-const RISK_REWARD = 2;
+// ============================================
+// FETCH OHLCV
+// ============================================
 
-const INITIAL_BALANCE = 1000;
-const RISK_PER_TRADE = 100;
+async function fetchCandles() {
 
-const CANDLE_LIMIT = 5000;
+    const since =
+        Date.now() - ((DAYS + 5) * 24 * 60 * 60 * 1000);
 
-// ======================================================
-// FETCH CANDLES
-// ======================================================
+    let allCandles = [];
+    let fetchSince = since;
 
-async function getCandles() {
+    while (true) {
 
-    console.log("Fetching candles...");
-
-    const candles =
-        await exchange.fetchOHLCV(
+        const candles = await exchange.fetchOHLCV(
             SYMBOL,
             TIMEFRAME,
-            undefined,
-            CANDLE_LIMIT
+            fetchSince,
+            1000
         );
 
-    return candles.map(c => ({
-        time: c[0],
-        open: c[1],
-        high: c[2],
-        low: c[3],
-        close: c[4],
-        volume: c[5]
-    }));
+        if (!candles.length)
+            break;
+
+        allCandles.push(...candles);
+
+        console.log(
+            `Fetched candles: ${allCandles.length}`
+        );
+
+        fetchSince =
+            candles[candles.length - 1][0] + 1;
+
+        if (candles.length < 1000)
+            break;
+    }
+
+    return allCandles;
 }
 
-// ======================================================
-// BACKTEST
-// ======================================================
-
-async function runBacktest() {
-
-    try {
-
-        const candles =
-            await getCandles();
-
-        const closes =
-            candles.map(c => c.close);
-
-        // ==================================================
-        // INDICATORS
-        // ==================================================
-
-        const fastEMA =
-            ti.EMA.calculate({
-                period: FAST_EMA,
-                values: closes
-            });
-
-        const slowEMA =
-            ti.EMA.calculate({
-                period: SLOW_EMA,
-                values: closes
-            });
-
-        const trendEMA =
-            ti.EMA.calculate({
-                period: TREND_EMA,
-                values: closes
-            });
-
-        const rsi =
-            ti.RSI.calculate({
-                period: RSI_LENGTH,
-                values: closes
-            });
-
-        // ==================================================
-        // START INDEX
-        // ==================================================
-
-        const startIndex =
-            TREND_EMA + 5;
-
-        // ==================================================
-        // STATS
-        // ==================================================
-
-        let balance =
-            INITIAL_BALANCE;
-
-        let totalTrades = 0;
-        let wins = 0;
-        let losses = 0;
-
-        let totalProfit = 0;
-        let totalLoss = 0;
-
-        // ==================================================
-        // LOOP
-        // ==================================================
-
-        for (
-            let i = startIndex;
-            i < candles.length - 1;
-            i++
-        ) {
-
-            // ==============================================
-            // EMA VALUES
-            // ==============================================
-
-            const fastCurrent =
-                fastEMA[i - FAST_EMA];
-
-            const fastPrevious =
-                fastEMA[
-                    i - FAST_EMA - 1
-                ];
-
-            const slowCurrent =
-                slowEMA[i - SLOW_EMA];
-
-            const slowPrevious =
-                slowEMA[
-                    i - SLOW_EMA - 1
-                ];
-
-            const trendCurrent =
-                trendEMA[
-                    i - TREND_EMA
-                ];
-
-            const rsiCurrent =
-                rsi[i - RSI_LENGTH];
-
-            if (
-                !fastCurrent ||
-                !slowCurrent ||
-                !trendCurrent ||
-                !rsiCurrent
-            ) {
-                continue;
-            }
-
-            // ==============================================
-            // CROSSOVER
-            // ==============================================
-
-            const bullCross =
-                fastPrevious <
-                slowPrevious &&
-                fastCurrent >
-                slowCurrent;
-
-            const bearCross =
-                fastPrevious >
-                slowPrevious &&
-                fastCurrent <
-                slowCurrent;
-
-            // ==============================================
-            // TREND
-            // ==============================================
-
-            const bullishTrend =
-                fastCurrent >
-                trendCurrent;
-
-            const bearishTrend =
-                fastCurrent <
-                trendCurrent;
-
-            // ==============================================
-            // SIGNALS
-            // ==============================================
-
-            const buySignal =
-                bullCross &&
-                bullishTrend &&
-                rsiCurrent > 50;
-
-            const sellSignal =
-                bearCross &&
-                bearishTrend &&
-                rsiCurrent < 50;
-
-            if (
-                !buySignal &&
-                !sellSignal
-            ) {
-                continue;
-            }
-
-            // ==============================================
-            // ENTRY
-            // ==============================================
-
-            const entry =
-                candles[i].close;
-
-            let stopLoss;
-            let takeProfit;
-
-            let side = "";
-
-            // ==============================================
-            // BUY
-            // ==============================================
-
-            if (buySignal) {
-
-                side = "BUY";
-
-                stopLoss =
-                    fastCurrent *
-                    (
-                        1 -
-                        STOP_BUFFER_PERCENT / 100
-                    );
-
-                const risk =
-                    entry - stopLoss;
+// ============================================
+// MAIN
+// ============================================
 
-                takeProfit =
-                    entry +
-                    (
-                        risk *
-                        RISK_REWARD
-                    );
-            }
+async function run() {
 
-            // ==============================================
-            // SELL
-            // ==============================================
+    console.log("\nFetching BTC data...\n");
 
-            if (sellSignal) {
-
-                side = "SELL";
+    const candles = await fetchCandles();
 
-                stopLoss =
-                    fastCurrent *
-                    (
-                        1 +
-                        STOP_BUFFER_PERCENT / 100
-                    );
+    const results = [];
 
-                const risk =
-                    stopLoss - entry;
+    for (let i = DAYS; i >= 1; i--) {
 
-                takeProfit =
-                    entry -
-                    (
-                        risk *
-                        RISK_REWARD
-                    );
-            }
+        // ====================================
+        // START TIME
+        // ====================================
 
-            // ==============================================
-            // CHECK FUTURE CANDLES
-            // ==============================================
+        const start = new Date();
 
-            let tradeClosed = false;
+        start.setDate(start.getDate() - i);
 
-            for (
-                let j = i + 1;
-                j < candles.length;
-                j++
-            ) {
+        start.setHours(
+            START_HOUR,
+            START_MINUTE,
+            0,
+            0
+        );
 
-                const high =
-                    candles[j].high;
+        // ====================================
+        // END TIME (NEXT DAY 5:30 PM)
+        // ====================================
 
-                const low =
-                    candles[j].low;
+        const end = new Date(start);
 
-                // ==========================================
-                // BUY RESULT
-                // ==========================================
+        end.setDate(end.getDate() + 1);
 
-                if (side === "BUY") {
+        end.setHours(
+            END_HOUR,
+            END_MINUTE,
+            0,
+            0
+        );
 
-                    // TP HIT
-                    if (high >= takeProfit) {
+        // ====================================
+        // FIND CANDLES
+        // ====================================
 
-                        const profit =
-                            RISK_PER_TRADE *
-                            RISK_REWARD;
+        const startCandle =
+            findNearestCandle(
+                candles,
+                start.getTime()
+            );
 
-                        balance += profit;
+        const endCandle =
+            findNearestCandle(
+                candles,
+                end.getTime()
+            );
 
-                        totalProfit += profit;
+        if (!startCandle || !endCandle)
+            continue;
 
-                        wins++;
-                        totalTrades++;
+        // ====================================
+        // INTERVAL CANDLES
+        // ====================================
 
-                        console.log(
-`✅ BUY WIN
+        const intervalCandles = candles.filter(
+            c =>
+                c[0] >= start.getTime() &&
+                c[0] <= end.getTime()
+        );
 
-Entry: ${entry}
-SL: ${stopLoss.toFixed(2)}
-TP: ${takeProfit.toFixed(2)}
-Balance: ${balance.toFixed(2)}`
-                        );
+        if (!intervalCandles.length)
+            continue;
 
-                        tradeClosed = true;
-                        break;
-                    }
+        // ====================================
+        // PRICES
+        // ====================================
 
-                    // SL HIT
-                    if (low <= stopLoss) {
+        const openPrice = startCandle[1];
 
-                        balance -=
-                            RISK_PER_TRADE;
+        const closePrice = endCandle[4];
 
-                        totalLoss +=
-                            RISK_PER_TRADE;
+        const highest = Math.max(
+            ...intervalCandles.map(c => c[2])
+        );
 
-                        losses++;
-                        totalTrades++;
+        const lowest = Math.min(
+            ...intervalCandles.map(c => c[3])
+        );
 
-                        console.log(
-`❌ BUY LOSS
+        // ====================================
+        // MOVES
+        // ====================================
 
-Entry: ${entry}
-SL: ${stopLoss.toFixed(2)}
-TP: ${takeProfit.toFixed(2)}
-Balance: ${balance.toFixed(2)}`
-                        );
+        const difference =
+            closePrice - openPrice;
 
-                        tradeClosed = true;
-                        break;
-                    }
-                }
-
-                // ==========================================
-                // SELL RESULT
-                // ==========================================
-
-                if (side === "SELL") {
-
-                    // TP HIT
-                    if (low <= takeProfit) {
-
-                        const profit =
-                            RISK_PER_TRADE *
-                            RISK_REWARD;
-
-                        balance += profit;
-
-                        totalProfit += profit;
-
-                        wins++;
-                        totalTrades++;
-
-                        console.log(
-`✅ SELL WIN
-
-Entry: ${entry}
-SL: ${stopLoss.toFixed(2)}
-TP: ${takeProfit.toFixed(2)}
-Balance: ${balance.toFixed(2)}`
-                        );
-
-                        tradeClosed = true;
-                        break;
-                    }
-
-                    // SL HIT
-                    if (high >= stopLoss) {
-
-                        balance -=
-                            RISK_PER_TRADE;
-
-                        totalLoss +=
-                            RISK_PER_TRADE;
-
-                        losses++;
-                        totalTrades++;
-
-                        console.log(
-`❌ SELL LOSS
-
-Entry: ${entry}
-SL: ${stopLoss.toFixed(2)}
-TP: ${takeProfit.toFixed(2)}
-Balance: ${balance.toFixed(2)}`
-                        );
-
-                        tradeClosed = true;
-                        break;
-                    }
-                }
-            }
+        const upMove =
+            highest - openPrice;
+
+        const downMove =
+            openPrice - lowest;
+
+        const netMove =
+            closePrice - openPrice;
+
+        // ====================================
+        // PUSH RESULT
+        // ====================================
+
+        results.push({
+
+            DAY:
+                start.toLocaleDateString("en-IN", {
+                    weekday: "long",
+                    timeZone: "Asia/Kolkata"
+                }),
+
+            FROM:
+                start.toLocaleString("en-IN", {
+                    timeZone: "Asia/Kolkata"
+                }),
+
+            TO:
+                end.toLocaleString("en-IN", {
+                    timeZone: "Asia/Kolkata"
+                }),
+
+            OPEN:
+                format(openPrice),
+
+            CLOSE:
+                format(closePrice),
+
+            DIFFERENCE:
+                (difference >= 0 ? "+" : "") +
+                format(difference),
+
+            HIGH_MOVE:
+                "+" + format(upMove),
+
+            LOW_MOVE:
+                "-" + format(downMove),
+
+            NET_MOVE:
+                (netMove >= 0 ? "+" : "") +
+                format(netMove)
+        });
+    }
+
+    // ============================================
+    // MAIN TABLE
+    // ============================================
+
+    console.table(results);
+
+    // ============================================
+    // NET MOVE DISTRIBUTION
+    // ============================================
+
+    const ranges = {
+        "0-250": 0,
+        "250-500": 0,
+        "500-750": 0,
+        "750-1000": 0,
+        "1000-1250": 0,
+        "1250-1500": 0,
+        "1500-2000": 0,
+        "2000-3000": 0,
+        "3000+": 0
+    };
+
+    for (const row of results) {
+
+        const move = Math.abs(
+            Number(
+                row.NET_MOVE.replace(/[+,]/g, "")
+            )
+        );
+
+        if (move >= 0 && move < 250) {
+            ranges["0-250"]++;
         }
 
-        // ==================================================
-        // FINAL STATS
-        // ==================================================
+        else if (move >= 250 && move < 500) {
+            ranges["250-500"]++;
+        }
 
-        const winRate =
-            (
-                wins /
-                Math.max(totalTrades, 1)
-            ) * 100;
+        else if (move >= 500 && move < 750) {
+            ranges["500-750"]++;
+        }
 
-        console.log(
-            "\n================================="
-        );
+        else if (move >= 750 && move < 1000) {
+            ranges["750-1000"]++;
+        }
 
-        console.log(
-            "BACKTEST COMPLETE"
-        );
+        else if (move >= 1000 && move < 1250) {
+            ranges["1000-1250"]++;
+        }
 
-        console.log(
-            "================================="
-        );
+        else if (move >= 1250 && move < 1500) {
+            ranges["1250-1500"]++;
+        }
 
-        console.log(
-            `Initial Balance: ${INITIAL_BALANCE}`
-        );
+        else if (move >= 1500 && move < 2000) {
+            ranges["1500-2000"]++;
+        }
 
-        console.log(
-            `Final Balance: ${balance.toFixed(2)}`
-        );
+        else if (move >= 2000 && move < 3000) {
+            ranges["2000-3000"]++;
+        }
 
-        console.log(
-            `Net Profit: ${(balance - INITIAL_BALANCE).toFixed(2)}`
-        );
-
-        console.log(
-            `Total Trades: ${totalTrades}`
-        );
-
-        console.log(
-            `Wins: ${wins}`
-        );
-
-        console.log(
-            `Losses: ${losses}`
-        );
-
-        console.log(
-            `Win Rate: ${winRate.toFixed(2)}%`
-        );
-
-        console.log(
-            `Total Profit: ${totalProfit.toFixed(2)}`
-        );
-
-        console.log(
-            `Total Loss: ${totalLoss.toFixed(2)}`
-        );
-
-    } catch (err) {
-
-        console.log(
-            "BACKTEST ERROR:"
-        );
-
-        console.log(
-            err.message
-        );
+        else {
+            ranges["3000+"]++;
+        }
     }
+
+    // ============================================
+    // DISTRIBUTION TABLE
+    // ============================================
+
+    console.log("\n====================================");
+    console.log("NET MOVE DISTRIBUTION");
+    console.log("====================================\n");
+
+    console.table(
+        Object.entries(ranges).map(([range, count]) => ({
+            RANGE: range,
+            COUNT: count
+        }))
+    );
+
+    // ============================================
+    // SUMMARY
+    // ============================================
+
+    const avgDiff =
+        results.reduce((a, b) => {
+
+            return a +
+                Number(
+                    b.DIFFERENCE
+                        .replace(/[+,]/g, "")
+                );
+
+        }, 0) / results.length;
+
+    const avgUp =
+        results.reduce((a, b) => {
+
+            return a +
+                Number(
+                    b.HIGH_MOVE
+                        .replace(/[+,]/g, "")
+                );
+
+        }, 0) / results.length;
+
+    const avgDown =
+        results.reduce((a, b) => {
+
+            return a +
+                Number(
+                    b.LOW_MOVE
+                        .replace(/[-,]/g, "")
+                );
+
+        }, 0) / results.length;
+
+    // ============================================
+    // FINAL SUMMARY
+    // ============================================
+
+    console.log("\n====================================");
+    console.log("BTC SESSION ANALYSIS");
+    console.log("====================================\n");
+
+    console.log(
+        "Average Difference:",
+        Math.round(avgDiff)
+    );
+
+    console.log(
+        "Average High Move:",
+        Math.round(avgUp)
+    );
+
+    console.log(
+        "Average Low Move:",
+        Math.round(avgDown)
+    );
+
+    console.log("\nDone.\n");
 }
 
-// ======================================================
+// ============================================
 // START
-// ======================================================
+// ============================================
 
-runBacktest();
+run().catch(console.error);

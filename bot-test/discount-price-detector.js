@@ -1,12 +1,21 @@
 require("dotenv").config();
+
 const ccxt = require("ccxt");
 const axios = require("axios");
-//const TelegramBot = require("node-telegram-bot-api");
+
+// ======================================================
+// ENV
+// ======================================================
 
 const API_KEY = process.env.GRID_WEB_KEY;
 const API_SECRET = process.env.GRID_WEB_SECRET;
 
-//const bot = new TelegramBot(BOT_TOKEN);
+const TOKEN = process.env.TELEGRAM_MATHEMATIC_TOKEN;
+const CHAT_ID = process.env.TELEGRAM_MATHEMATIC_CHAT_ID;
+
+// ======================================================
+// EXCHANGE
+// ======================================================
 
 const exchange = new ccxt.delta({
     apiKey: API_KEY,
@@ -19,6 +28,11 @@ const exchange = new ccxt.delta({
         }
     }
 });
+
+// ======================================================
+// SYMBOLS
+// ======================================================
+
 const symbols = [
     "BTCUSD",
     "ETHUSD",
@@ -26,17 +40,51 @@ const symbols = [
     "SLVONUSD",
 ];
 
-// Prevent overlapping interval execution
+// ======================================================
+// SETTINGS
+// ======================================================
+
+const RESET_BUFFER = {
+    BTCUSD: 100,
+    ETHUSD: 10,
+    PAXGUSD: 5,
+    SLVONUSD: 0.5
+};
+
+const DISCOUNT_BUFFER = {
+    BTCUSD: 100,
+    ETHUSD: 10,
+    PAXGUSD: 5,
+    SLVONUSD: 0.5
+};
+
+const COOLDOWN_MINUTES = {
+    BTCUSD: 30,
+    ETHUSD: 30,
+    PAXGUSD: 45,
+    SLVONUSD: 60
+};
+
+// ======================================================
+// GLOBAL STATE
+// ======================================================
+
 let isRunning = false;
 
-// Store alert state per symbol
+// Prevent repeated alerts
 const alertState = {};
- 
-const TOKEN = process.env.TELEGRAM_MATHEMATIC_TOKEN;
-const CHAT_ID = process.env.TELEGRAM_MATHEMATIC_CHAT_ID;
+
+// Store last alert time
+const lastAlertTime = {};
+
+// ======================================================
+// TELEGRAM
+// ======================================================
 
 async function sendTelegram(message) {
-    try {  
+
+    try {
+
         await axios.post(
             `https://api.telegram.org/bot${TOKEN}/sendMessage`,
             {
@@ -45,14 +93,31 @@ async function sendTelegram(message) {
                 parse_mode: "HTML"
             }
         );
+
     } catch (err) {
+
         console.log("Telegram Error:", err.message);
+
     }
 }
 
+// ======================================================
+// MAIN LOGIC
+// ======================================================
+
 async function getDiscountData(symbol) {
+
+    // ==========================================
+    // FETCH CANDLES
+    // ==========================================
+
     const candles =
-        await exchange.fetchOHLCV(symbol, '15m', undefined, 100);
+        await exchange.fetchOHLCV(
+            symbol,
+            "15m",
+            undefined,
+            100
+        );
 
     const highs = candles.map(c => c[2]);
     const lows = candles.map(c => c[3]);
@@ -60,41 +125,66 @@ async function getDiscountData(symbol) {
     const recentHigh = Math.max(...highs);
     const recentLow = Math.min(...lows);
 
-    // Smart Money equilibrium
+    // ==========================================
+    // EQUILIBRIUM
+    // ==========================================
+
     const equilibrium =
         recentLow + ((recentHigh - recentLow) * 0.5);
+
+    // ==========================================
+    // LIVE PRICE
+    // ==========================================
 
     const ticker = await exchange.fetchTicker(symbol);
 
     const price = ticker.last;
 
-    let discountBuffer = 0;
+    // ==========================================
+    // DISCOUNT ZONE
+    // ==========================================
 
-    // if (symbol === 'BTCUSD') {
-    //     discountBuffer = 50;
-    // } else if (symbol === 'ETHUSD') {
-    //     discountBuffer = 5;
-    // } else if (symbol === 'PAXGUSD') {
-    //     discountBuffer = 10;
-    // } else if (symbol === 'SLVONUSD') {
-    //     discountBuffer = 1;
-    // }
-
-    // Near low price
     const nearLowPrice =
-        recentLow + discountBuffer;
+        recentLow + DISCOUNT_BUFFER[symbol];
 
-    // Discount condition
+    // IMPORTANT:
+    // NO Math.round() in logic
     const inDiscount =
-        Math.round(price) <= Math.round(nearLowPrice);
+        price <= nearLowPrice;
 
-    // Reset alert when price moves above equilibrium
-    if (price > equilibrium) {
+    // ==========================================
+    // RESET ALERT STATE
+    // ==========================================
+
+    if (
+        price >
+        equilibrium + RESET_BUFFER[symbol]
+    ) {
         alertState[symbol] = false;
     }
 
-    // Send only one alert until reset
-    if (inDiscount && !alertState[symbol]) {
+    // ==========================================
+    // COOLDOWN
+    // ==========================================
+
+    const now = Date.now();
+
+    const cooldown =
+        COOLDOWN_MINUTES[symbol] * 60 * 1000;
+
+    const canAlert =
+        !lastAlertTime[symbol] ||
+        now - lastAlertTime[symbol] > cooldown;
+
+    // ==========================================
+    // SEND ALERT
+    // ==========================================
+
+    if (
+        inDiscount &&
+        !alertState[symbol] &&
+        canAlert
+    ) {
 
         const symbolEmoji = {
             BTCUSD: "₿",
@@ -104,28 +194,30 @@ async function getDiscountData(symbol) {
         };
 
         const message = `
-🟢 <b>(${symbolEmoji[symbol]}) ${symbol} DISCOUNT ZONE</b>
+🟢 <b>${symbolEmoji[symbol]} ${symbol} DISCOUNT ZONE</b>
 
 ━━━━━━━━━━━━━━
 
-💰 <b>Symbol:</b> (${symbolEmoji[symbol]}) ${symbol}
+💰 <b>Price:</b> ${price.toFixed(2)}
 
-📍 <b>Current Price:</b> ${Math.round(price)}
+📈 <b>Recent High:</b> ${recentHigh.toFixed(2)}
 
-📈 <b>Recent High:</b> ${Math.round(recentHigh)}
+📉 <b>Recent Low:</b> ${recentLow.toFixed(2)}
 
-📉 <b>Recent Low:</b> ${Math.round(recentLow)}
+⚖️ <b>Equilibrium:</b> ${equilibrium.toFixed(2)}
 
-⚖️ <b>Equilibrium:</b> ${Math.round(equilibrium)}
-
-🎯 <b>Discount Zone:</b> ${Math.round(nearLowPrice)}
+🎯 <b>Discount Zone:</b> ${nearLowPrice.toFixed(2)}
 
 ━━━━━━━━━━━━━━
 
 🕒 <b>Time:</b>
-${new Date().toLocaleString("en-IN", {
-    timeZone: "Asia/Kolkata"
-})}
+
+${new Date().toLocaleString(
+    "en-IN",
+    {
+        timeZone: "Asia/Kolkata"
+    }
+)}
 
 🚀 Smart Money Discount Opportunity
 `;
@@ -134,29 +226,61 @@ ${new Date().toLocaleString("en-IN", {
 
         await sendTelegram(message);
 
+        // Save alert state
         alertState[symbol] = true;
+
+        // Save last alert time
+        lastAlertTime[symbol] = now;
     }
 
+    // ==========================================
+    // RETURN TABLE DATA
+    // ==========================================
+
     return {
+
         Symbol: symbol,
-        Price: price,
-        High: recentHigh,
+
+        Price: price.toFixed(2),
+
+        High: recentHigh.toFixed(2),
+
         Equilibrium: equilibrium.toFixed(2),
-        Low: recentLow,
-        //DiscountBuffer: nearLowPrice,
+
+        Low: recentLow.toFixed(2),
+
+        DiscountZone: nearLowPrice.toFixed(2),
+
         Discount: inDiscount ? "YES" : "NO",
-        AlertSent: alertState[symbol] ? "YES" : "NO",
+
+        AlertSent: alertState[symbol]
+            ? "YES"
+            : "NO",
+
+        Cooldown:
+            lastAlertTime[symbol]
+                ? `${Math.floor(
+                    (
+                        Date.now() -
+                        lastAlertTime[symbol]
+                    ) / 1000
+                )} sec ago`
+                : "-",
+
         Time: new Date().toLocaleString(
             "en-IN",
-            { timeZone: "Asia/Kolkata" }
+            {
+                timeZone: "Asia/Kolkata"
+            }
         )
     };
 }
 
-async function run() {
+// ======================================================
+// RUN
+// ======================================================
 
-    //console.clear();
-    //process.stdout.write('\x1Bc');
+async function run() {
 
     if (isRunning) return;
 
@@ -165,26 +289,40 @@ async function run() {
     try {
 
         const tableData = await Promise.all(
-            symbols.map(symbol => getDiscountData(symbol))
+            symbols.map(symbol =>
+                getDiscountData(symbol)
+            )
         );
 
-        // console.clear();
-        // process.stdout.write('\x1Bc');
-        // console.table(tableData);
+        console.clear();
+
+        //console.table(tableData);
 
     } catch (err) {
 
-        console.log("ERROR:", err.message);
+        console.log(
+            "ERROR:",
+            err.message
+        );
 
     } finally {
 
         isRunning = false;
+
     }
 }
+
+// ======================================================
+// START
+// ======================================================
 
 // Run immediately
 run();
 
 // Run every 1 minute
-//setInterval(run, 1 * 60 * 1000);
+// setInterval(
+//     run,
+//     1 * 60 * 1000
+// );
+
 module.exports = { run };

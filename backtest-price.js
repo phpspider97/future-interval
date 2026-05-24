@@ -7,16 +7,16 @@ const exchange = new ccxt.binance({
 
 const SYMBOL = "BTC/USDT";
 const TIMEFRAME = "1m";
-const DAYS = 360;
+const DAYS = 30;
 
 // ================= SETTINGS =================
 
 // STRANGLE SETTINGS
-const STRIKE_DISTANCE = 1100;
+const STRIKE_DISTANCE = 800;
 const SL_BUFFER = 0;
 
 // DYNAMIC INTERVAL SETTINGS
-const INTERVAL_SIZE = 4; // hours
+const INTERVAL_SIZE = 3; // hours
 const INTERVAL_SHIFT = 1; // shift by +hour
 const HOLD_MINUTES = INTERVAL_SIZE*60;
 

@@ -45,17 +45,17 @@ const symbols = [
 // ======================================================
 
 const RESET_BUFFER = {
-    BTCUSD: 100,
-    ETHUSD: 10,
-    PAXGUSD: 5,
-    SLVONUSD: 0.5
+    BTCUSD: 10,
+    ETHUSD: 1,
+    PAXGUSD: 1,
+    SLVONUSD: 0.05
 };
 
 const DISCOUNT_BUFFER = {
-    BTCUSD: 100,
-    ETHUSD: 10,
-    PAXGUSD: 5,
-    SLVONUSD: 0.5
+    BTCUSD: 10,
+    ETHUSD: 1,
+    PAXGUSD: 1,
+    SLVONUSD: 0.05
 };
 
 const COOLDOWN_MINUTES = {

@@ -1025,17 +1025,17 @@ async function run() {
 
     console.clear();
 
-    console.log(
-        "\nMULTI-ASSET SCALPING BOT\n"
-    );
+    // console.log(
+    //     "\nMULTI-ASSET SCALPING BOT\n"
+    // );
 
     //console.table(tableData);
 
-    console.log(
-        `Last Update: ${
-            new Date().toLocaleString()
-        }`
-    );
+    // console.log(
+    //     `Last Update: ${
+    //         new Date().toLocaleString()
+    //     }`
+    // );
 }
 
 // ======================================================

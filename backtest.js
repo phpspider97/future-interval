@@ -1,385 +1,805 @@
 require("dotenv").config();
 
 const ccxt = require("ccxt");
+const ti = require("technicalindicators");
 
-// ============================================
-// CONFIG
-// ============================================
-
-const SYMBOL = "BTC/USDT";
-const TIMEFRAME = "30m";
-const DAYS = 30;
-
-// SESSION TIME
-const START_HOUR = 9;
-const START_MINUTE = 0;
-
-const END_HOUR = 10;
-const END_MINUTE = 0;
-
-// ============================================
+// ======================================================
 // EXCHANGE
-// ============================================
+// ======================================================
 
 const exchange = new ccxt.binance({
-    enableRateLimit: true,
-    options: {
-        defaultType: "future"
-    }
+    enableRateLimit: true
 });
 
-// ============================================
-// HELPERS
-// ============================================
+// ======================================================
+// CONFIG
+// ======================================================
 
-function format(num) {
-    return Math.round(num).toLocaleString();
-}
+const SYMBOL = "BTC/USDT";
 
-function findNearestCandle(candles, targetTime) {
+const TIMEFRAME = "1m";
 
-    return candles.find(c => c[0] >= targetTime);
-}
+// ======================================================
+// DAYS
+// ======================================================
 
-// ============================================
-// FETCH OHLCV
-// ============================================
+// node backtest.js 365
 
-async function fetchCandles() {
+const DAYS =
+    Number(process.argv[2]) || 30;
 
-    const since =
-        Date.now() - ((DAYS + 5) * 24 * 60 * 60 * 1000);
+// ======================================================
+// STRATEGY
+// ======================================================
+
+const FAST_EMA = 21;
+
+const SLOW_EMA = 50;
+
+const TREND_EMA = 200;
+
+const RSI_LENGTH = 14;
+
+const VOLUME_MULTIPLIER = 1.2;
+
+const STOP_BUFFER_PERCENT = 0.15;
+
+const RISK_REWARD = 1.5;
+
+// ======================================================
+// REALISTIC SETTINGS
+// ======================================================
+
+const FEES_PERCENT = 0.05;
+
+const SLIPPAGE_PERCENT = 0.02;
+
+const COOLDOWN_CANDLES = 5;
+
+const MAX_HOLD_CANDLES = 50;
+
+// ======================================================
+// FETCH DATA
+// ======================================================
+
+async function getCandles() {
 
     let allCandles = [];
-    let fetchSince = since;
+
+    const limit = 1000;
+
+    let since =
+        Date.now() -
+        DAYS * 24 * 60 * 60 * 1000;
 
     while (true) {
 
-        const candles = await exchange.fetchOHLCV(
-            SYMBOL,
-            TIMEFRAME,
-            fetchSince,
-            1000
-        );
-
-        if (!candles.length)
-            break;
-
-        allCandles.push(...candles);
-
         console.log(
-            `Fetched candles: ${allCandles.length}`
+            `Fetching:
+            ${new Date(since).toLocaleString()}`
         );
 
-        fetchSince =
+        const candles =
+            await exchange.fetchOHLCV(
+                SYMBOL,
+                TIMEFRAME,
+                since,
+                limit
+            );
+
+        if (!candles.length) {
+            break;
+        }
+
+        allCandles =
+            allCandles.concat(candles);
+
+        since =
             candles[candles.length - 1][0] + 1;
 
-        if (candles.length < 1000)
+        console.log(
+            `Fetched:
+            ${allCandles.length}`
+        );
+
+        if (candles.length < limit) {
             break;
+        }
     }
 
-    return allCandles;
+    // ==================================================
+    // REMOVE DUPLICATES
+    // ==================================================
+
+    const uniqueCandles =
+        Array.from(
+            new Map(
+                allCandles.map(c => [c[0], c])
+            ).values()
+        );
+
+    return uniqueCandles.map(c => ({
+        time: c[0],
+        open: c[1],
+        high: c[2],
+        low: c[3],
+        close: c[4],
+        volume: c[5]
+    }));
 }
 
-// ============================================
-// MAIN
-// ============================================
+// ======================================================
+// BACKTEST
+// ======================================================
 
-async function run() {
+async function backtest() {
 
-    console.log("\nFetching BTC data...\n");
+    console.log("\nFETCHING DATA...\n");
 
-    const candles = await fetchCandles();
+    const candles =
+        await getCandles();
 
-    const results = [];
+    console.log(
+        `\nTOTAL CANDLES:
+        ${candles.length}\n`
+    );
 
-    for (let i = DAYS; i >= 1; i--) {
+    // ==================================================
+    // ARRAYS
+    // ==================================================
 
-        // ====================================
-        // START TIME
-        // ====================================
+    const closes =
+        candles.map(c => c.close);
 
-        const start = new Date();
+    const volumes =
+        candles.map(c => c.volume);
 
-        start.setDate(start.getDate() - i);
+    // ==================================================
+    // INDICATORS
+    // ==================================================
 
-        start.setHours(
-            START_HOUR,
-            START_MINUTE,
-            0,
-            0
-        );
+    const fastEMA =
+        ti.EMA.calculate({
+            period: FAST_EMA,
+            values: closes
+        });
 
-        // ====================================
-        // END TIME (NEXT DAY 5:30 PM)
-        // ====================================
+    const slowEMA =
+        ti.EMA.calculate({
+            period: SLOW_EMA,
+            values: closes
+        });
 
-        const end = new Date(start);
+    const trendEMA =
+        ti.EMA.calculate({
+            period: TREND_EMA,
+            values: closes
+        });
 
-        end.setDate(end.getDate() + 1);
+    const rsi =
+        ti.RSI.calculate({
+            period: RSI_LENGTH,
+            values: closes
+        });
 
-        end.setHours(
-            END_HOUR,
-            END_MINUTE,
-            0,
-            0
-        );
+    // ==================================================
+    // START INDEX
+    // ==================================================
 
-        // ====================================
-        // FIND CANDLES
-        // ====================================
+    const startIndex =
+        TREND_EMA + 10;
 
-        const startCandle =
-            findNearestCandle(
-                candles,
-                start.getTime()
+    // ==================================================
+    // STATS
+    // ==================================================
+
+    let totalTrades = 0;
+
+    let wins = 0;
+
+    let losses = 0;
+
+    let totalPnL = 0;
+
+    let maxWin = 0;
+
+    let maxLoss = 0;
+
+    let lastTradeIndex = -999;
+
+    let tradeLogs = [];
+
+    // ==================================================
+    // HOURLY STATS
+    // ==================================================
+
+    const hourlyStats = {};
+
+    for (let h = 0; h < 24; h++) {
+
+        hourlyStats[h] = {
+
+            trades: 0,
+
+            wins: 0,
+
+            losses: 0,
+
+            pnl: 0
+        };
+    }
+
+    // ==================================================
+    // MAIN LOOP
+    // ==================================================
+
+    for (
+        let i = startIndex;
+        i < candles.length - 1;
+        i++
+    ) {
+
+        // ==============================================
+        // COOLDOWN
+        // ==============================================
+
+        if (
+            i - lastTradeIndex <
+            COOLDOWN_CANDLES
+        ) {
+            continue;
+        }
+
+        const candle =
+            candles[i];
+
+        const prevCandle =
+            candles[i - 1];
+
+        // ==============================================
+        // EMA FIX
+        // ==============================================
+
+        const fastCurrent =
+            fastEMA[i - FAST_EMA];
+
+        const slowCurrent =
+            slowEMA[i - SLOW_EMA];
+
+        const trendCurrent =
+            trendEMA[i - TREND_EMA];
+
+        const rsiCurrent =
+            rsi[i - RSI_LENGTH];
+
+        if (
+            !fastCurrent ||
+            !slowCurrent ||
+            !trendCurrent ||
+            !rsiCurrent
+        ) {
+            continue;
+        }
+
+        // ==============================================
+        // CONDITIONS
+        // ==============================================
+
+        const bullishTrend =
+            candle.close >
+            trendCurrent;
+
+        const bearishTrend =
+            candle.close <
+            trendCurrent;
+
+        const emaBullish =
+            fastCurrent >
+            slowCurrent;
+
+        const emaBearish =
+            fastCurrent <
+            slowCurrent;
+
+        const nearFastEMAForBuy =
+            candle.close <=
+            fastCurrent * 1.001;
+
+        const nearFastEMAForSell =
+            candle.close >=
+            fastCurrent * 0.999;
+
+        const bullishCandle =
+            candle.close >
+            candle.open &&
+            candle.close >
+            prevCandle.high;
+
+        const bearishCandle =
+            candle.close <
+            candle.open &&
+            candle.close <
+            prevCandle.low;
+
+        const avgVolume =
+            volumes
+                .slice(i - 25, i)
+                .reduce((a, b) => a + b, 0) / 25;
+
+        const highVolume =
+            candle.volume >
+            avgVolume *
+            VOLUME_MULTIPLIER;
+
+        // ==============================================
+        // SIGNALS
+        // ==============================================
+
+        const buySignal =
+
+            bullishTrend &&
+            emaBullish &&
+            nearFastEMAForBuy &&
+            bullishCandle &&
+            highVolume &&
+            rsiCurrent > 50;
+
+        const sellSignal =
+
+            bearishTrend &&
+            emaBearish &&
+            nearFastEMAForSell &&
+            bearishCandle &&
+            highVolume &&
+            rsiCurrent < 50;
+
+        if (
+            !buySignal &&
+            !sellSignal
+        ) {
+            continue;
+        }
+
+        // ==============================================
+        // ENTRY
+        // ==============================================
+
+        lastTradeIndex = i;
+
+        totalTrades++;
+
+        // ==============================================
+        // TRADE HOUR
+        // ==============================================
+
+        const tradeHour =
+            new Date(candle.time)
+                .getUTCHours();
+
+        // UTC → IST
+        const indiaHour =
+            (tradeHour + 5 + 30 / 60) % 24;
+
+        const hourKey =
+            Math.floor(indiaHour);
+
+        hourlyStats[hourKey].trades++;
+
+        // ==============================================
+        // ENTRY
+        // ==============================================
+
+        let side = "";
+
+        let entry =
+            candle.close;
+
+        // ==============================================
+        // SLIPPAGE
+        // ==============================================
+
+        if (buySignal) {
+
+            side = "BUY";
+
+            entry =
+                entry *
+                (
+                    1 +
+                    SLIPPAGE_PERCENT / 100
+                );
+        }
+
+        if (sellSignal) {
+
+            side = "SELL";
+
+            entry =
+                entry *
+                (
+                    1 -
+                    SLIPPAGE_PERCENT / 100
+                );
+        }
+
+        let sl;
+
+        let tp;
+
+        // ==============================================
+        // BUY
+        // ==============================================
+
+        if (buySignal) {
+
+            sl =
+                fastCurrent *
+                (
+                    1 -
+                    STOP_BUFFER_PERCENT / 100
+                );
+
+            const risk =
+                entry - sl;
+
+            tp =
+                entry +
+                (
+                    risk *
+                    RISK_REWARD
+                );
+        }
+
+        // ==============================================
+        // SELL
+        // ==============================================
+
+        if (sellSignal) {
+
+            sl =
+                fastCurrent *
+                (
+                    1 +
+                    STOP_BUFFER_PERCENT / 100
+                );
+
+            const risk =
+                sl - entry;
+
+            tp =
+                entry -
+                (
+                    risk *
+                    RISK_REWARD
+                );
+        }
+
+        // ==============================================
+        // TRADE MANAGEMENT
+        // ==============================================
+
+        let result = "OPEN";
+
+        let pnl = 0;
+
+        let exitPrice = 0;
+
+        let holdCandles = 0;
+
+        for (
+            let j = i + 1;
+            j < candles.length;
+            j++
+        ) {
+
+            holdCandles++;
+
+            const next =
+                candles[j];
+
+            // ==========================================
+            // TIME EXIT
+            // ==========================================
+
+            if (
+                holdCandles >=
+                MAX_HOLD_CANDLES
+            ) {
+
+                exitPrice =
+                    next.close;
+
+                if (side === "BUY") {
+
+                    pnl =
+                        exitPrice - entry;
+                }
+
+                if (side === "SELL") {
+
+                    pnl =
+                        entry - exitPrice;
+                }
+
+                result = "TIME EXIT";
+
+                totalPnL += pnl;
+
+                hourlyStats[hourKey].pnl += pnl;
+
+                break;
+            }
+
+            // ==========================================
+            // BUY EXIT
+            // ==========================================
+
+            if (side === "BUY") {
+
+                // LOSS
+                if (next.low <= sl) {
+
+                    exitPrice = sl;
+
+                    pnl =
+                        sl - entry;
+
+                    result = "LOSS";
+
+                    losses++;
+
+                    totalPnL += pnl;
+
+                    hourlyStats[hourKey].losses++;
+
+                    hourlyStats[hourKey].pnl += pnl;
+
+                    break;
+                }
+
+                // WIN
+                if (next.high >= tp) {
+
+                    exitPrice = tp;
+
+                    pnl =
+                        tp - entry;
+
+                    result = "WIN";
+
+                    wins++;
+
+                    totalPnL += pnl;
+
+                    hourlyStats[hourKey].wins++;
+
+                    hourlyStats[hourKey].pnl += pnl;
+
+                    break;
+                }
+            }
+
+            // ==========================================
+            // SELL EXIT
+            // ==========================================
+
+            if (side === "SELL") {
+
+                // LOSS
+                if (next.high >= sl) {
+
+                    exitPrice = sl;
+
+                    pnl =
+                        entry - sl;
+
+                    result = "LOSS";
+
+                    losses++;
+
+                    totalPnL += pnl;
+
+                    hourlyStats[hourKey].losses++;
+
+                    hourlyStats[hourKey].pnl += pnl;
+
+                    break;
+                }
+
+                // WIN
+                if (next.low <= tp) {
+
+                    exitPrice = tp;
+
+                    pnl =
+                        entry - tp;
+
+                    result = "WIN";
+
+                    wins++;
+
+                    totalPnL += pnl;
+
+                    hourlyStats[hourKey].wins++;
+
+                    hourlyStats[hourKey].pnl += pnl;
+
+                    break;
+                }
+            }
+        }
+
+        // ==============================================
+        // FEES
+        // ==============================================
+
+        const fees =
+            (
+                entry +
+                exitPrice
+            ) *
+            (
+                FEES_PERCENT / 100
             );
 
-        const endCandle =
-            findNearestCandle(
-                candles,
-                end.getTime()
-            );
+        pnl -= fees;
 
-        if (!startCandle || !endCandle)
-            continue;
+        // ==============================================
+        // MAX WIN/LOSS
+        // ==============================================
 
-        // ====================================
-        // INTERVAL CANDLES
-        // ====================================
+        if (pnl > maxWin) {
+            maxWin = pnl;
+        }
 
-        const intervalCandles = candles.filter(
-            c =>
-                c[0] >= start.getTime() &&
-                c[0] <= end.getTime()
-        );
+        if (pnl < maxLoss) {
+            maxLoss = pnl;
+        }
 
-        if (!intervalCandles.length)
-            continue;
+        // ==============================================
+        // TRADE LOG
+        // ==============================================
 
-        // ====================================
-        // PRICES
-        // ====================================
+        tradeLogs.push({
 
-        const openPrice = startCandle[1];
+            Time:
+                new Date(candle.time)
+                    .toLocaleString("en-IN", {
+                        timeZone: "Asia/Kolkata"
+                    }),
 
-        const closePrice = endCandle[4];
+            Hour:
+                `${hourKey}:00`,
 
-        const highest = Math.max(
-            ...intervalCandles.map(c => c[2])
-        );
+            Side: side,
 
-        const lowest = Math.min(
-            ...intervalCandles.map(c => c[3])
-        );
+            Entry:
+                entry.toFixed(2),
 
-        // ====================================
-        // MOVES
-        // ====================================
+            Exit:
+                exitPrice.toFixed(2),
 
-        const difference =
-            closePrice - openPrice;
+            SL:
+                sl.toFixed(2),
 
-        const upMove =
-            highest - openPrice;
+            TP:
+                tp.toFixed(2),
 
-        const downMove =
-            openPrice - lowest;
+            Result: result,
 
-        const netMove =
-            closePrice - openPrice;
+            Hold:
+                holdCandles,
 
-        // ====================================
-        // PUSH RESULT
-        // ====================================
-
-        results.push({
-
-            DAY:
-                start.toLocaleDateString("en-IN", {
-                    weekday: "long",
-                    timeZone: "Asia/Kolkata"
-                }),
-
-            FROM:
-                start.toLocaleString("en-IN", {
-                    timeZone: "Asia/Kolkata"
-                }),
-
-            TO:
-                end.toLocaleString("en-IN", {
-                    timeZone: "Asia/Kolkata"
-                }),
-
-            OPEN:
-                format(openPrice),
-
-            CLOSE:
-                format(closePrice),
-
-            DIFFERENCE:
-                (difference >= 0 ? "+" : "") +
-                format(difference),
-
-            HIGH_MOVE:
-                "+" + format(upMove),
-
-            LOW_MOVE:
-                "-" + format(downMove),
-
-            NET_MOVE:
-                (netMove >= 0 ? "+" : "") +
-                format(netMove)
+            PnL:
+                pnl.toFixed(2)
         });
     }
 
-    // ============================================
-    // MAIN TABLE
-    // ============================================
+    // ==================================================
+    // TRADE LOGS
+    // ==================================================
 
-    console.table(results);
+    console.log("\nTRADE LOGS\n");
 
-    // ============================================
-    // NET MOVE DISTRIBUTION
-    // ============================================
+    console.table(tradeLogs);
 
-    const ranges = {
-        "0-250": 0,
-        "250-500": 0,
-        "500-750": 0,
-        "750-1000": 0,
-        "1000-1250": 0,
-        "1250-1500": 0,
-        "1500-2000": 0,
-        "2000-3000": 0,
-        "3000+": 0
-    };
+    // ==================================================
+    // FINAL RESULT
+    // ==================================================
 
-    for (const row of results) {
+    const winRate =
+        totalTrades > 0
+            ? (
+                wins / totalTrades * 100
+            ).toFixed(2)
+            : 0;
 
-        const move = Math.abs(
-            Number(
-                row.NET_MOVE.replace(/[+,]/g, "")
-            )
-        );
+    console.log("\nFINAL RESULT\n");
 
-        if (move >= 0 && move < 250) {
-            ranges["0-250"]++;
-        }
+    console.table([{
 
-        else if (move >= 250 && move < 500) {
-            ranges["250-500"]++;
-        }
+        Symbol: SYMBOL,
 
-        else if (move >= 500 && move < 750) {
-            ranges["500-750"]++;
-        }
+        Timeframe: TIMEFRAME,
 
-        else if (move >= 750 && move < 1000) {
-            ranges["750-1000"]++;
-        }
+        Days: DAYS,
 
-        else if (move >= 1000 && move < 1250) {
-            ranges["1000-1250"]++;
-        }
+        Trades: totalTrades,
 
-        else if (move >= 1250 && move < 1500) {
-            ranges["1250-1500"]++;
-        }
+        Wins: wins,
 
-        else if (move >= 1500 && move < 2000) {
-            ranges["1500-2000"]++;
-        }
+        Losses: losses,
 
-        else if (move >= 2000 && move < 3000) {
-            ranges["2000-3000"]++;
-        }
+        "Win Rate %": winRate,
 
-        else {
-            ranges["3000+"]++;
-        }
+        "Max Win":
+            maxWin.toFixed(2),
+
+        "Max Loss":
+            maxLoss.toFixed(2),
+
+        "Total PnL":
+            totalPnL.toFixed(2)
+    }]);
+
+    // ==================================================
+    // HOURLY REPORT
+    // ==================================================
+
+    const hourlyTable = [];
+
+    for (let h = 0; h < 24; h++) {
+
+        const stats =
+            hourlyStats[h];
+
+        const winRate =
+            stats.trades > 0
+                ? (
+                    stats.wins /
+                    stats.trades * 100
+                ).toFixed(2)
+                : "0.00";
+
+        hourlyTable.push({
+
+            Hour:
+                `${h}:00`,
+
+            Trades:
+                stats.trades,
+
+            Wins:
+                stats.wins,
+
+            Losses:
+                stats.losses,
+
+            "Win Rate %":
+                winRate,
+
+            PnL:
+                stats.pnl.toFixed(2)
+        });
     }
 
-    // ============================================
-    // DISTRIBUTION TABLE
-    // ============================================
+    // ==================================================
+    // SORT BEST HOURS
+    // ==================================================
 
-    console.log("\n====================================");
-    console.log("NET MOVE DISTRIBUTION");
-    console.log("====================================\n");
-
-    console.table(
-        Object.entries(ranges).map(([range, count]) => ({
-            RANGE: range,
-            COUNT: count
-        }))
+    hourlyTable.sort(
+        (a, b) =>
+            Number(b["Win Rate %"]) -
+            Number(a["Win Rate %"])
     );
 
-    // ============================================
-    // SUMMARY
-    // ============================================
+    console.log("\nBEST HOURS (IST)\n");
 
-    const avgDiff =
-        results.reduce((a, b) => {
-
-            return a +
-                Number(
-                    b.DIFFERENCE
-                        .replace(/[+,]/g, "")
-                );
-
-        }, 0) / results.length;
-
-    const avgUp =
-        results.reduce((a, b) => {
-
-            return a +
-                Number(
-                    b.HIGH_MOVE
-                        .replace(/[+,]/g, "")
-                );
-
-        }, 0) / results.length;
-
-    const avgDown =
-        results.reduce((a, b) => {
-
-            return a +
-                Number(
-                    b.LOW_MOVE
-                        .replace(/[-,]/g, "")
-                );
-
-        }, 0) / results.length;
-
-    // ============================================
-    // FINAL SUMMARY
-    // ============================================
-
-    console.log("\n====================================");
-    console.log("BTC SESSION ANALYSIS");
-    console.log("====================================\n");
-
-    console.log(
-        "Average Difference:",
-        Math.round(avgDiff)
-    );
-
-    console.log(
-        "Average High Move:",
-        Math.round(avgUp)
-    );
-
-    console.log(
-        "Average Low Move:",
-        Math.round(avgDown)
-    );
-
-    console.log("\nDone.\n");
+    console.table(hourlyTable);
 }
 
-// ============================================
+// ======================================================
 // START
-// ============================================
+// ======================================================
 
-run().catch(console.error);
+backtest();

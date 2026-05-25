@@ -1,7 +1,22 @@
 const express = require("express");
 const http = require("http");
 const { Server } = require("socket.io");
-const path = require("path"); 
+const path = require("path")
+const axios = require('axios')
+
+async function getPublicIP() {
+    try {
+        const response = await axios.get("https://api.ipify.org?format=json");
+        console.log("Public IP:", response.data.ip);
+        console.log(
+            `IP : ${response.data.ip}`,
+            `DETECT PUBLIC IP ADDRESS`
+        );
+    } catch (err) {
+        console.error(err.message);
+    }
+}
+getPublicIP()
 
 const discount_price_detector = require('./bot-test/discount-price-detector')
 const intervalManager = require('./bot-test/intervalManager')

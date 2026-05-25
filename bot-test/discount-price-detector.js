@@ -294,7 +294,7 @@ async function run() {
             )
         );
 
-        console.clear();
+        //console.clear();
 
         //console.table(tableData);
 

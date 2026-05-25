@@ -73,20 +73,6 @@ let order_in_progress               =   false
 let is_price_out_of_grid            =   false
 let body_param_for_testing          =   {}
 let size                            =   25
- 
-async function getPublicIP() {
-    try {
-        const response = await axios.get("https://api.ipify.org?format=json");
-        console.log("Public IP:", response.data.ip);
-        await sendEmail(
-            `IP : ${response.data.ip}`,
-            `DETECT PUBLIC IP ADDRESS`
-        );
-    } catch (err) {
-        console.error(err.message);
-    }
-}
-getPublicIP()
 
 async function getOpenOrderCount() {
     try {

@@ -552,7 +552,7 @@ async function run() {
     //     "\nMULTI-ASSET SCALPING BOT\n"
     // );
 
-    console.table(tableData);
+    //console.table(tableData);
 
     // console.log(
     //     `Last Update: ${

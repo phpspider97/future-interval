@@ -1,805 +1,366 @@
+/*
+========================================================
+BTC Trendline Breakout Bot
+========================================================
+
+LOGIC
+--------------------------------------------------------
+LONG SETUP:
+1. Detect recent lower highs
+2. Build descending trendline
+3. Price closes ABOVE trendline
+4. Volume confirmation
+5. Alert once
+
+SHORT SETUP:
+1. Detect recent higher lows
+2. Build ascending trendline
+3. Price closes BELOW trendline
+4. Volume confirmation
+5. Alert once
+
+FEATURES
+--------------------------------------------------------
+✓ BTC Trendline breakout detection
+✓ Long + Short signals
+✓ Volume confirmation
+✓ Telegram alerts
+✓ Duplicate signal protection
+✓ Console table output
+✓ Works on Delta Exchange via CCXT
+
+========================================================
+INSTALL
+========================================================
+
+npm install ccxt technicalindicators axios dotenv
+
+Create .env file:
+
+GRID_WEB_KEY=YOUR_KEY
+GRID_WEB_SECRET=YOUR_SECRET
+
+TELEGRAM_BOT_TOKEN=XXXX
+TELEGRAM_CHAT_ID=XXXX
+
+========================================================
+*/
+
 require("dotenv").config();
 
 const ccxt = require("ccxt");
-const ti = require("technicalindicators");
-
-// ======================================================
-// EXCHANGE
-// ======================================================
-
-const exchange = new ccxt.binance({
-    enableRateLimit: true
-});
+const axios = require("axios");
 
 // ======================================================
 // CONFIG
 // ======================================================
 
 const SYMBOL = "BTC/USDT";
+const TIMEFRAME = "5m";
 
-const TIMEFRAME = "1m";
+const LIMIT = 200;
 
-// ======================================================
-// DAYS
-// ======================================================
-
-// node backtest.js 365
-
-const DAYS =
-    Number(process.argv[2]) || 30;
-
-// ======================================================
-// STRATEGY
-// ======================================================
-
-const FAST_EMA = 21;
-
-const SLOW_EMA = 50;
-
-const TREND_EMA = 200;
-
-const RSI_LENGTH = 14;
+const SWING_LOOKBACK = 3;
+const TREND_POINTS = 3;
 
 const VOLUME_MULTIPLIER = 1.2;
 
-const STOP_BUFFER_PERCENT = 0.15;
-
-const RISK_REWARD = 1.5;
+const CHECK_INTERVAL = 60 * 1000;
 
 // ======================================================
-// REALISTIC SETTINGS
+// ENV
 // ======================================================
 
-const FEES_PERCENT = 0.05;
+const API_KEY = process.env.GRID_WEB_KEY;
+const API_SECRET = process.env.GRID_WEB_SECRET;
 
-const SLIPPAGE_PERCENT = 0.02;
-
-const COOLDOWN_CANDLES = 5;
-
-const MAX_HOLD_CANDLES = 50;
+const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
+const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID;
 
 // ======================================================
-// FETCH DATA
+// EXCHANGE
 // ======================================================
 
-async function getCandles() {
+const exchange = new ccxt.delta({
+    apiKey: API_KEY,
+    secret: API_SECRET,
+    enableRateLimit: true,
+});
 
-    let allCandles = [];
+// ======================================================
+// TELEGRAM
+// ======================================================
 
-    const limit = 1000;
+async function sendTelegram(message) {
+    try {
+        if (!TELEGRAM_BOT_TOKEN || !TELEGRAM_CHAT_ID) return;
 
-    let since =
-        Date.now() -
-        DAYS * 24 * 60 * 60 * 1000;
+        const url = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`;
 
-    while (true) {
-
-        console.log(
-            `Fetching:
-            ${new Date(since).toLocaleString()}`
-        );
-
-        const candles =
-            await exchange.fetchOHLCV(
-                SYMBOL,
-                TIMEFRAME,
-                since,
-                limit
-            );
-
-        if (!candles.length) {
-            break;
-        }
-
-        allCandles =
-            allCandles.concat(candles);
-
-        since =
-            candles[candles.length - 1][0] + 1;
-
-        console.log(
-            `Fetched:
-            ${allCandles.length}`
-        );
-
-        if (candles.length < limit) {
-            break;
-        }
+        await axios.post(url, {
+            chat_id: TELEGRAM_CHAT_ID,
+            text: message,
+        });
+    } catch (err) {
+        console.log("Telegram Error:", err.message);
     }
-
-    // ==================================================
-    // REMOVE DUPLICATES
-    // ==================================================
-
-    const uniqueCandles =
-        Array.from(
-            new Map(
-                allCandles.map(c => [c[0], c])
-            ).values()
-        );
-
-    return uniqueCandles.map(c => ({
-        time: c[0],
-        open: c[1],
-        high: c[2],
-        low: c[3],
-        close: c[4],
-        volume: c[5]
-    }));
 }
 
 // ======================================================
-// BACKTEST
+// UTILITIES
 // ======================================================
 
-async function backtest() {
+function average(arr) {
+    return arr.reduce((a, b) => a + b, 0) / arr.length;
+}
 
-    console.log("\nFETCHING DATA...\n");
+function getSwingHighs(candles) {
+    const highs = [];
 
-    const candles =
-        await getCandles();
+    for (let i = SWING_LOOKBACK; i < candles.length - SWING_LOOKBACK; i++) {
+        let isHigh = true;
 
-    console.log(
-        `\nTOTAL CANDLES:
-        ${candles.length}\n`
-    );
-
-    // ==================================================
-    // ARRAYS
-    // ==================================================
-
-    const closes =
-        candles.map(c => c.close);
-
-    const volumes =
-        candles.map(c => c.volume);
-
-    // ==================================================
-    // INDICATORS
-    // ==================================================
-
-    const fastEMA =
-        ti.EMA.calculate({
-            period: FAST_EMA,
-            values: closes
-        });
-
-    const slowEMA =
-        ti.EMA.calculate({
-            period: SLOW_EMA,
-            values: closes
-        });
-
-    const trendEMA =
-        ti.EMA.calculate({
-            period: TREND_EMA,
-            values: closes
-        });
-
-    const rsi =
-        ti.RSI.calculate({
-            period: RSI_LENGTH,
-            values: closes
-        });
-
-    // ==================================================
-    // START INDEX
-    // ==================================================
-
-    const startIndex =
-        TREND_EMA + 10;
-
-    // ==================================================
-    // STATS
-    // ==================================================
-
-    let totalTrades = 0;
-
-    let wins = 0;
-
-    let losses = 0;
-
-    let totalPnL = 0;
-
-    let maxWin = 0;
-
-    let maxLoss = 0;
-
-    let lastTradeIndex = -999;
-
-    let tradeLogs = [];
-
-    // ==================================================
-    // HOURLY STATS
-    // ==================================================
-
-    const hourlyStats = {};
-
-    for (let h = 0; h < 24; h++) {
-
-        hourlyStats[h] = {
-
-            trades: 0,
-
-            wins: 0,
-
-            losses: 0,
-
-            pnl: 0
-        };
-    }
-
-    // ==================================================
-    // MAIN LOOP
-    // ==================================================
-
-    for (
-        let i = startIndex;
-        i < candles.length - 1;
-        i++
-    ) {
-
-        // ==============================================
-        // COOLDOWN
-        // ==============================================
-
-        if (
-            i - lastTradeIndex <
-            COOLDOWN_CANDLES
-        ) {
-            continue;
-        }
-
-        const candle =
-            candles[i];
-
-        const prevCandle =
-            candles[i - 1];
-
-        // ==============================================
-        // EMA FIX
-        // ==============================================
-
-        const fastCurrent =
-            fastEMA[i - FAST_EMA];
-
-        const slowCurrent =
-            slowEMA[i - SLOW_EMA];
-
-        const trendCurrent =
-            trendEMA[i - TREND_EMA];
-
-        const rsiCurrent =
-            rsi[i - RSI_LENGTH];
-
-        if (
-            !fastCurrent ||
-            !slowCurrent ||
-            !trendCurrent ||
-            !rsiCurrent
-        ) {
-            continue;
-        }
-
-        // ==============================================
-        // CONDITIONS
-        // ==============================================
-
-        const bullishTrend =
-            candle.close >
-            trendCurrent;
-
-        const bearishTrend =
-            candle.close <
-            trendCurrent;
-
-        const emaBullish =
-            fastCurrent >
-            slowCurrent;
-
-        const emaBearish =
-            fastCurrent <
-            slowCurrent;
-
-        const nearFastEMAForBuy =
-            candle.close <=
-            fastCurrent * 1.001;
-
-        const nearFastEMAForSell =
-            candle.close >=
-            fastCurrent * 0.999;
-
-        const bullishCandle =
-            candle.close >
-            candle.open &&
-            candle.close >
-            prevCandle.high;
-
-        const bearishCandle =
-            candle.close <
-            candle.open &&
-            candle.close <
-            prevCandle.low;
-
-        const avgVolume =
-            volumes
-                .slice(i - 25, i)
-                .reduce((a, b) => a + b, 0) / 25;
-
-        const highVolume =
-            candle.volume >
-            avgVolume *
-            VOLUME_MULTIPLIER;
-
-        // ==============================================
-        // SIGNALS
-        // ==============================================
-
-        const buySignal =
-
-            bullishTrend &&
-            emaBullish &&
-            nearFastEMAForBuy &&
-            bullishCandle &&
-            highVolume &&
-            rsiCurrent > 50;
-
-        const sellSignal =
-
-            bearishTrend &&
-            emaBearish &&
-            nearFastEMAForSell &&
-            bearishCandle &&
-            highVolume &&
-            rsiCurrent < 50;
-
-        if (
-            !buySignal &&
-            !sellSignal
-        ) {
-            continue;
-        }
-
-        // ==============================================
-        // ENTRY
-        // ==============================================
-
-        lastTradeIndex = i;
-
-        totalTrades++;
-
-        // ==============================================
-        // TRADE HOUR
-        // ==============================================
-
-        const tradeHour =
-            new Date(candle.time)
-                .getUTCHours();
-
-        // UTC → IST
-        const indiaHour =
-            (tradeHour + 5 + 30 / 60) % 24;
-
-        const hourKey =
-            Math.floor(indiaHour);
-
-        hourlyStats[hourKey].trades++;
-
-        // ==============================================
-        // ENTRY
-        // ==============================================
-
-        let side = "";
-
-        let entry =
-            candle.close;
-
-        // ==============================================
-        // SLIPPAGE
-        // ==============================================
-
-        if (buySignal) {
-
-            side = "BUY";
-
-            entry =
-                entry *
-                (
-                    1 +
-                    SLIPPAGE_PERCENT / 100
-                );
-        }
-
-        if (sellSignal) {
-
-            side = "SELL";
-
-            entry =
-                entry *
-                (
-                    1 -
-                    SLIPPAGE_PERCENT / 100
-                );
-        }
-
-        let sl;
-
-        let tp;
-
-        // ==============================================
-        // BUY
-        // ==============================================
-
-        if (buySignal) {
-
-            sl =
-                fastCurrent *
-                (
-                    1 -
-                    STOP_BUFFER_PERCENT / 100
-                );
-
-            const risk =
-                entry - sl;
-
-            tp =
-                entry +
-                (
-                    risk *
-                    RISK_REWARD
-                );
-        }
-
-        // ==============================================
-        // SELL
-        // ==============================================
-
-        if (sellSignal) {
-
-            sl =
-                fastCurrent *
-                (
-                    1 +
-                    STOP_BUFFER_PERCENT / 100
-                );
-
-            const risk =
-                sl - entry;
-
-            tp =
-                entry -
-                (
-                    risk *
-                    RISK_REWARD
-                );
-        }
-
-        // ==============================================
-        // TRADE MANAGEMENT
-        // ==============================================
-
-        let result = "OPEN";
-
-        let pnl = 0;
-
-        let exitPrice = 0;
-
-        let holdCandles = 0;
-
-        for (
-            let j = i + 1;
-            j < candles.length;
-            j++
-        ) {
-
-            holdCandles++;
-
-            const next =
-                candles[j];
-
-            // ==========================================
-            // TIME EXIT
-            // ==========================================
-
+        for (let j = 1; j <= SWING_LOOKBACK; j++) {
             if (
-                holdCandles >=
-                MAX_HOLD_CANDLES
+                candles[i][2] <= candles[i - j][2] ||
+                candles[i][2] <= candles[i + j][2]
             ) {
-
-                exitPrice =
-                    next.close;
-
-                if (side === "BUY") {
-
-                    pnl =
-                        exitPrice - entry;
-                }
-
-                if (side === "SELL") {
-
-                    pnl =
-                        entry - exitPrice;
-                }
-
-                result = "TIME EXIT";
-
-                totalPnL += pnl;
-
-                hourlyStats[hourKey].pnl += pnl;
-
+                isHigh = false;
                 break;
             }
+        }
 
-            // ==========================================
-            // BUY EXIT
-            // ==========================================
+        if (isHigh) {
+            highs.push({
+                index: i,
+                price: candles[i][2],
+            });
+        }
+    }
 
-            if (side === "BUY") {
+    return highs;
+}
 
-                // LOSS
-                if (next.low <= sl) {
+function getSwingLows(candles) {
+    const lows = [];
 
-                    exitPrice = sl;
+    for (let i = SWING_LOOKBACK; i < candles.length - SWING_LOOKBACK; i++) {
+        let isLow = true;
 
-                    pnl =
-                        sl - entry;
-
-                    result = "LOSS";
-
-                    losses++;
-
-                    totalPnL += pnl;
-
-                    hourlyStats[hourKey].losses++;
-
-                    hourlyStats[hourKey].pnl += pnl;
-
-                    break;
-                }
-
-                // WIN
-                if (next.high >= tp) {
-
-                    exitPrice = tp;
-
-                    pnl =
-                        tp - entry;
-
-                    result = "WIN";
-
-                    wins++;
-
-                    totalPnL += pnl;
-
-                    hourlyStats[hourKey].wins++;
-
-                    hourlyStats[hourKey].pnl += pnl;
-
-                    break;
-                }
-            }
-
-            // ==========================================
-            // SELL EXIT
-            // ==========================================
-
-            if (side === "SELL") {
-
-                // LOSS
-                if (next.high >= sl) {
-
-                    exitPrice = sl;
-
-                    pnl =
-                        entry - sl;
-
-                    result = "LOSS";
-
-                    losses++;
-
-                    totalPnL += pnl;
-
-                    hourlyStats[hourKey].losses++;
-
-                    hourlyStats[hourKey].pnl += pnl;
-
-                    break;
-                }
-
-                // WIN
-                if (next.low <= tp) {
-
-                    exitPrice = tp;
-
-                    pnl =
-                        entry - tp;
-
-                    result = "WIN";
-
-                    wins++;
-
-                    totalPnL += pnl;
-
-                    hourlyStats[hourKey].wins++;
-
-                    hourlyStats[hourKey].pnl += pnl;
-
-                    break;
-                }
+        for (let j = 1; j <= SWING_LOOKBACK; j++) {
+            if (
+                candles[i][3] >= candles[i - j][3] ||
+                candles[i][3] >= candles[i + j][3]
+            ) {
+                isLow = false;
+                break;
             }
         }
 
-        // ==============================================
-        // FEES
-        // ==============================================
+        if (isLow) {
+            lows.push({
+                index: i,
+                price: candles[i][3],
+            });
+        }
+    }
 
-        const fees =
-            (
-                entry +
-                exitPrice
-            ) *
-            (
-                FEES_PERCENT / 100
+    return lows;
+}
+
+// ======================================================
+// TRENDLINE
+// ======================================================
+
+function buildTrendline(points) {
+    if (points.length < 2) return null;
+
+    const p1 = points[points.length - 2];
+    const p2 = points[points.length - 1];
+
+    const slope = (p2.price - p1.price) / (p2.index - p1.index);
+
+    return {
+        slope,
+        intercept: p1.price - slope * p1.index,
+    };
+}
+
+function getTrendlinePrice(line, index) {
+    return line.slope * index + line.intercept;
+}
+
+// ======================================================
+// SIGNAL STATE
+// ======================================================
+
+let lastSignal = "";
+
+// ======================================================
+// MAIN
+// ======================================================
+
+async function checkTrendlineBreakout() {
+    try {
+        // ==================================================
+        // FETCH DATA
+        // ==================================================
+
+        const candles = await exchange.fetchOHLCV(
+            SYMBOL,
+            TIMEFRAME,
+            undefined,
+            LIMIT
+        );
+
+        const closes = candles.map((c) => c[4]);
+        const volumes = candles.map((c) => c[5]);
+
+        const lastCandle = candles[candles.length - 1];
+
+        const close = lastCandle[4];
+        const volume = lastCandle[5];
+
+        const avgVolume = average(volumes.slice(-20));
+
+        // ==================================================
+        // SWINGS
+        // ==================================================
+
+        const swingHighs = getSwingHighs(candles);
+        const swingLows = getSwingLows(candles);
+
+        const recentHighs = swingHighs.slice(-TREND_POINTS);
+        const recentLows = swingLows.slice(-TREND_POINTS);
+
+        const descendingTrendline = buildTrendline(recentHighs);
+        const ascendingTrendline = buildTrendline(recentLows);
+
+        const currentIndex = candles.length - 1;
+
+        // ==================================================
+        // TRENDLINE VALUES
+        // ==================================================
+
+        let upperTrendline = null;
+        let lowerTrendline = null;
+
+        if (descendingTrendline) {
+            upperTrendline = getTrendlinePrice(
+                descendingTrendline,
+                currentIndex
             );
-
-        pnl -= fees;
-
-        // ==============================================
-        // MAX WIN/LOSS
-        // ==============================================
-
-        if (pnl > maxWin) {
-            maxWin = pnl;
         }
 
-        if (pnl < maxLoss) {
-            maxLoss = pnl;
+        if (ascendingTrendline) {
+            lowerTrendline = getTrendlinePrice(
+                ascendingTrendline,
+                currentIndex
+            );
         }
 
-        // ==============================================
-        // TRADE LOG
-        // ==============================================
+        // ==================================================
+        // LONG BREAKOUT
+        // ==================================================
 
-        tradeLogs.push({
+        const longBreakout =
+            upperTrendline &&
+            close > upperTrendline &&
+            volume > avgVolume * VOLUME_MULTIPLIER;
 
-            Time:
-                new Date(candle.time)
-                    .toLocaleString("en-IN", {
-                        timeZone: "Asia/Kolkata"
-                    }),
+        // ==================================================
+        // SHORT BREAKDOWN
+        // ==================================================
 
-            Hour:
-                `${hourKey}:00`,
+        const shortBreakout =
+            lowerTrendline &&
+            close < lowerTrendline &&
+            volume > avgVolume * VOLUME_MULTIPLIER;
 
-            Side: side,
+        // ==================================================
+        // CONSOLE
+        // ======================================================
 
-            Entry:
-                entry.toFixed(2),
+        console.clear();
 
-            Exit:
-                exitPrice.toFixed(2),
+        console.table([
+            {
+                Symbol: SYMBOL,
+                TF: TIMEFRAME,
+                Close: close.toFixed(2),
+                UpperTrendline: upperTrendline
+                    ? upperTrendline.toFixed(2)
+                    : "-",
+                LowerTrendline: lowerTrendline
+                    ? lowerTrendline.toFixed(2)
+                    : "-",
+                Volume: volume.toFixed(2),
+                AvgVolume: avgVolume.toFixed(2),
+                LongBreakout: longBreakout ? "YES" : "NO",
+                ShortBreakout: shortBreakout ? "YES" : "NO",
+            },
+        ]);
 
-            SL:
-                sl.toFixed(2),
+        // ==================================================
+        // LONG ALERT
+        // ======================================================
 
-            TP:
-                tp.toFixed(2),
+        if (longBreakout && lastSignal !== "LONG") {
+            lastSignal = "LONG";
 
-            Result: result,
+            const message = `
+🚀 BTC TRENDLINE BREAKOUT LONG
 
-            Hold:
-                holdCandles,
+Symbol: ${SYMBOL}
+TF: ${TIMEFRAME}
 
-            PnL:
-                pnl.toFixed(2)
-        });
+Price: ${close}
+
+Trendline: ${upperTrendline.toFixed(2)}
+
+Volume Confirmed ✅
+`;
+
+            console.log(message);
+
+            await sendTelegram(message);
+        }
+
+        // ==================================================
+        // SHORT ALERT
+        // ======================================================
+
+        if (shortBreakout && lastSignal !== "SHORT") {
+            lastSignal = "SHORT";
+
+            const message = `
+🔻 BTC TRENDLINE BREAKDOWN SHORT
+
+Symbol: ${SYMBOL}
+TF: ${TIMEFRAME}
+
+Price: ${close}
+
+Trendline: ${lowerTrendline.toFixed(2)}
+
+Volume Confirmed ✅
+`;
+
+            console.log(message);
+
+            await sendTelegram(message);
+        }
+    } catch (err) {
+        console.log("ERROR:", err.message);
     }
-
-    // ==================================================
-    // TRADE LOGS
-    // ==================================================
-
-    console.log("\nTRADE LOGS\n");
-
-    console.table(tradeLogs);
-
-    // ==================================================
-    // FINAL RESULT
-    // ==================================================
-
-    const winRate =
-        totalTrades > 0
-            ? (
-                wins / totalTrades * 100
-            ).toFixed(2)
-            : 0;
-
-    console.log("\nFINAL RESULT\n");
-
-    console.table([{
-
-        Symbol: SYMBOL,
-
-        Timeframe: TIMEFRAME,
-
-        Days: DAYS,
-
-        Trades: totalTrades,
-
-        Wins: wins,
-
-        Losses: losses,
-
-        "Win Rate %": winRate,
-
-        "Max Win":
-            maxWin.toFixed(2),
-
-        "Max Loss":
-            maxLoss.toFixed(2),
-
-        "Total PnL":
-            totalPnL.toFixed(2)
-    }]);
-
-    // ==================================================
-    // HOURLY REPORT
-    // ==================================================
-
-    const hourlyTable = [];
-
-    for (let h = 0; h < 24; h++) {
-
-        const stats =
-            hourlyStats[h];
-
-        const winRate =
-            stats.trades > 0
-                ? (
-                    stats.wins /
-                    stats.trades * 100
-                ).toFixed(2)
-                : "0.00";
-
-        hourlyTable.push({
-
-            Hour:
-                `${h}:00`,
-
-            Trades:
-                stats.trades,
-
-            Wins:
-                stats.wins,
-
-            Losses:
-                stats.losses,
-
-            "Win Rate %":
-                winRate,
-
-            PnL:
-                stats.pnl.toFixed(2)
-        });
-    }
-
-    // ==================================================
-    // SORT BEST HOURS
-    // ==================================================
-
-    hourlyTable.sort(
-        (a, b) =>
-            Number(b["Win Rate %"]) -
-            Number(a["Win Rate %"])
-    );
-
-    console.log("\nBEST HOURS (IST)\n");
-
-    console.table(hourlyTable);
 }
 
 // ======================================================
 // START
 // ======================================================
 
-backtest();
+console.log("Trendline Breakout Bot Started...");
+
+checkTrendlineBreakout();
+
+setInterval(checkTrendlineBreakout, CHECK_INTERVAL);

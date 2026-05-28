@@ -44,11 +44,11 @@ const exchange = new ccxt.delta({
 
 const SYMBOLS = [
     "BTCUSD",
-    "ETHUSD",
+    //"ETHUSD",
     //"PAXGUSD"
 ];
 
-const TIMEFRAME = "1m";
+const TIMEFRAME = "15m";
 
 const FAST_EMA = 21;
 const SLOW_EMA = 50;
@@ -59,7 +59,7 @@ const RSI_LENGTH = 14;
 const VOLUME_MULTIPLIER = 1.2;
 
 const STOP_BUFFER_PERCENT = 0.15;
-const RISK_REWARD = 1.5;
+const RISK_REWARD = 1;
 
 const CHECK_INTERVAL = 30000;
 

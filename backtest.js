@@ -1,366 +1,635 @@
-/*
-========================================================
-BTC Trendline Breakout Bot
-========================================================
-
-LOGIC
---------------------------------------------------------
-LONG SETUP:
-1. Detect recent lower highs
-2. Build descending trendline
-3. Price closes ABOVE trendline
-4. Volume confirmation
-5. Alert once
-
-SHORT SETUP:
-1. Detect recent higher lows
-2. Build ascending trendline
-3. Price closes BELOW trendline
-4. Volume confirmation
-5. Alert once
-
-FEATURES
---------------------------------------------------------
-✓ BTC Trendline breakout detection
-✓ Long + Short signals
-✓ Volume confirmation
-✓ Telegram alerts
-✓ Duplicate signal protection
-✓ Console table output
-✓ Works on Delta Exchange via CCXT
-
-========================================================
-INSTALL
-========================================================
-
-npm install ccxt technicalindicators axios dotenv
-
-Create .env file:
-
-GRID_WEB_KEY=YOUR_KEY
-GRID_WEB_SECRET=YOUR_SECRET
-
-TELEGRAM_BOT_TOKEN=XXXX
-TELEGRAM_CHAT_ID=XXXX
-
-========================================================
-*/
-
 require("dotenv").config();
 
 const ccxt = require("ccxt");
-const axios = require("axios");
-
-// ======================================================
-// CONFIG
-// ======================================================
-
-const SYMBOL = "BTC/USDT";
-const TIMEFRAME = "5m";
-
-const LIMIT = 200;
-
-const SWING_LOOKBACK = 3;
-const TREND_POINTS = 3;
-
-const VOLUME_MULTIPLIER = 1.2;
-
-const CHECK_INTERVAL = 60 * 1000;
-
-// ======================================================
-// ENV
-// ======================================================
-
-const API_KEY = process.env.GRID_WEB_KEY;
-const API_SECRET = process.env.GRID_WEB_SECRET;
-
-const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
-const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID;
+const ti = require("technicalindicators");
 
 // ======================================================
 // EXCHANGE
 // ======================================================
 
 const exchange = new ccxt.delta({
-    apiKey: API_KEY,
-    secret: API_SECRET,
     enableRateLimit: true,
+    options: {
+        defaultType: "future"
+    },
+    urls: {
+        api: {
+            public: "https://api.india.delta.exchange",
+            private: "https://api.india.delta.exchange",
+        }
+    }
 });
 
 // ======================================================
-// TELEGRAM
+// CONFIG
 // ======================================================
 
-async function sendTelegram(message) {
-    try {
-        if (!TELEGRAM_BOT_TOKEN || !TELEGRAM_CHAT_ID) return;
+const SYMBOL = "BTCUSD";
 
-        const url = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`;
+const TIMEFRAME = "15m";
 
-        await axios.post(url, {
-            chat_id: TELEGRAM_CHAT_ID,
-            text: message,
-        });
-    } catch (err) {
-        console.log("Telegram Error:", err.message);
-    }
-}
+const FAST_EMA = 21;
+const SLOW_EMA = 50;
+const TREND_EMA = 200;
+
+const RSI_LENGTH = 14;
+
+const RR = 1
+
+const STOP_BUFFER = 0.15;
+
+const VOLUME_MULTIPLIER = 1.2;
+
+const INITIAL_BALANCE = 1000;
 
 // ======================================================
-// UTILITIES
+// FETCH HISTORICAL DATA
 // ======================================================
 
-function average(arr) {
-    return arr.reduce((a, b) => a + b, 0) / arr.length;
-}
+async function fetchAllCandles() {
 
-function getSwingHighs(candles) {
-    const highs = [];
+    let since =
+        Date.now() - (30 * 24 * 60 * 60 * 1000);
 
-    for (let i = SWING_LOOKBACK; i < candles.length - SWING_LOOKBACK; i++) {
-        let isHigh = true;
+    let allCandles = [];
 
-        for (let j = 1; j <= SWING_LOOKBACK; j++) {
-            if (
-                candles[i][2] <= candles[i - j][2] ||
-                candles[i][2] <= candles[i + j][2]
-            ) {
-                isHigh = false;
-                break;
-            }
+    while (true) {
+
+        const candles =
+            await exchange.fetchOHLCV(
+                SYMBOL,
+                TIMEFRAME,
+                since,
+                1000
+            );
+
+        if (!candles.length) {
+            break;
         }
 
-        if (isHigh) {
-            highs.push({
-                index: i,
-                price: candles[i][2],
-            });
-        }
-    }
+        allCandles.push(...candles);
 
-    return highs;
-}
+        since =
+            candles[candles.length - 1][0] + 1;
 
-function getSwingLows(candles) {
-    const lows = [];
-
-    for (let i = SWING_LOOKBACK; i < candles.length - SWING_LOOKBACK; i++) {
-        let isLow = true;
-
-        for (let j = 1; j <= SWING_LOOKBACK; j++) {
-            if (
-                candles[i][3] >= candles[i - j][3] ||
-                candles[i][3] >= candles[i + j][3]
-            ) {
-                isLow = false;
-                break;
-            }
-        }
-
-        if (isLow) {
-            lows.push({
-                index: i,
-                price: candles[i][3],
-            });
-        }
-    }
-
-    return lows;
-}
-
-// ======================================================
-// TRENDLINE
-// ======================================================
-
-function buildTrendline(points) {
-    if (points.length < 2) return null;
-
-    const p1 = points[points.length - 2];
-    const p2 = points[points.length - 1];
-
-    const slope = (p2.price - p1.price) / (p2.index - p1.index);
-
-    return {
-        slope,
-        intercept: p1.price - slope * p1.index,
-    };
-}
-
-function getTrendlinePrice(line, index) {
-    return line.slope * index + line.intercept;
-}
-
-// ======================================================
-// SIGNAL STATE
-// ======================================================
-
-let lastSignal = "";
-
-// ======================================================
-// MAIN
-// ======================================================
-
-async function checkTrendlineBreakout() {
-    try {
-        // ==================================================
-        // FETCH DATA
-        // ==================================================
-
-        const candles = await exchange.fetchOHLCV(
-            SYMBOL,
-            TIMEFRAME,
-            undefined,
-            LIMIT
+        console.log(
+            `Fetched Candles: ${allCandles.length}`
         );
 
-        const closes = candles.map((c) => c[4]);
-        const volumes = candles.map((c) => c[5]);
+        await new Promise(
+            r => setTimeout(r, 500)
+        );
 
-        const lastCandle = candles[candles.length - 1];
-
-        const close = lastCandle[4];
-        const volume = lastCandle[5];
-
-        const avgVolume = average(volumes.slice(-20));
-
-        // ==================================================
-        // SWINGS
-        // ==================================================
-
-        const swingHighs = getSwingHighs(candles);
-        const swingLows = getSwingLows(candles);
-
-        const recentHighs = swingHighs.slice(-TREND_POINTS);
-        const recentLows = swingLows.slice(-TREND_POINTS);
-
-        const descendingTrendline = buildTrendline(recentHighs);
-        const ascendingTrendline = buildTrendline(recentLows);
-
-        const currentIndex = candles.length - 1;
-
-        // ==================================================
-        // TRENDLINE VALUES
-        // ==================================================
-
-        let upperTrendline = null;
-        let lowerTrendline = null;
-
-        if (descendingTrendline) {
-            upperTrendline = getTrendlinePrice(
-                descendingTrendline,
-                currentIndex
-            );
+        if (candles.length < 1000) {
+            break;
         }
-
-        if (ascendingTrendline) {
-            lowerTrendline = getTrendlinePrice(
-                ascendingTrendline,
-                currentIndex
-            );
-        }
-
-        // ==================================================
-        // LONG BREAKOUT
-        // ==================================================
-
-        const longBreakout =
-            upperTrendline &&
-            close > upperTrendline &&
-            volume > avgVolume * VOLUME_MULTIPLIER;
-
-        // ==================================================
-        // SHORT BREAKDOWN
-        // ==================================================
-
-        const shortBreakout =
-            lowerTrendline &&
-            close < lowerTrendline &&
-            volume > avgVolume * VOLUME_MULTIPLIER;
-
-        // ==================================================
-        // CONSOLE
-        // ======================================================
-
-        console.clear();
-
-        console.table([
-            {
-                Symbol: SYMBOL,
-                TF: TIMEFRAME,
-                Close: close.toFixed(2),
-                UpperTrendline: upperTrendline
-                    ? upperTrendline.toFixed(2)
-                    : "-",
-                LowerTrendline: lowerTrendline
-                    ? lowerTrendline.toFixed(2)
-                    : "-",
-                Volume: volume.toFixed(2),
-                AvgVolume: avgVolume.toFixed(2),
-                LongBreakout: longBreakout ? "YES" : "NO",
-                ShortBreakout: shortBreakout ? "YES" : "NO",
-            },
-        ]);
-
-        // ==================================================
-        // LONG ALERT
-        // ======================================================
-
-        if (longBreakout && lastSignal !== "LONG") {
-            lastSignal = "LONG";
-
-            const message = `
-🚀 BTC TRENDLINE BREAKOUT LONG
-
-Symbol: ${SYMBOL}
-TF: ${TIMEFRAME}
-
-Price: ${close}
-
-Trendline: ${upperTrendline.toFixed(2)}
-
-Volume Confirmed ✅
-`;
-
-            console.log(message);
-
-            await sendTelegram(message);
-        }
-
-        // ==================================================
-        // SHORT ALERT
-        // ======================================================
-
-        if (shortBreakout && lastSignal !== "SHORT") {
-            lastSignal = "SHORT";
-
-            const message = `
-🔻 BTC TRENDLINE BREAKDOWN SHORT
-
-Symbol: ${SYMBOL}
-TF: ${TIMEFRAME}
-
-Price: ${close}
-
-Trendline: ${lowerTrendline.toFixed(2)}
-
-Volume Confirmed ✅
-`;
-
-            console.log(message);
-
-            await sendTelegram(message);
-        }
-    } catch (err) {
-        console.log("ERROR:", err.message);
     }
+
+    return allCandles.map(c => ({
+        time: c[0],
+        open: c[1],
+        high: c[2],
+        low: c[3],
+        close: c[4],
+        volume: c[5]
+    }));
+}
+
+// ======================================================
+// BACKTEST
+// ======================================================
+
+async function backtest() {
+
+    const candles =
+        await fetchAllCandles();
+
+    console.log(
+        `Total Candles: ${candles.length}`
+    );
+
+    const closes =
+        candles.map(c => c.close);
+
+    const volumes =
+        candles.map(c => c.volume);
+
+    // ==================================================
+    // INDICATORS
+    // ==================================================
+
+    const fastEMA =
+        ti.EMA.calculate({
+            period: FAST_EMA,
+            values: closes
+        });
+
+    const slowEMA =
+        ti.EMA.calculate({
+            period: SLOW_EMA,
+            values: closes
+        });
+
+    const trendEMA =
+        ti.EMA.calculate({
+            period: TREND_EMA,
+            values: closes
+        });
+
+    const rsi =
+        ti.RSI.calculate({
+            period: RSI_LENGTH,
+            values: closes
+        });
+
+    // ==================================================
+    // OFFSET
+    // ==================================================
+
+    const offset = TREND_EMA + 5;
+
+    // ==================================================
+    // STATS
+    // ==================================================
+
+    let balance = INITIAL_BALANCE;
+
+    let peakBalance = INITIAL_BALANCE;
+
+    let maxDrawdown = 0;
+
+    let wins = 0;
+
+    let losses = 0;
+
+    let grossProfit = 0;
+
+    let grossLoss = 0;
+
+    const trades = [];
+
+    // ==================================================
+    // MAIN LOOP
+    // ==================================================
+
+    for (
+        let i = offset;
+        i < candles.length - 20;
+        i++
+    ) {
+
+        const candle =
+            candles[i];
+
+        const price =
+            candle.close;
+
+        // ==============================================
+        // EMA VALUES
+        // ==============================================
+
+        const fast =
+            fastEMA[
+                i - FAST_EMA
+            ];
+
+        const slow =
+            slowEMA[
+                i - SLOW_EMA
+            ];
+
+        const trend =
+            trendEMA[
+                i - TREND_EMA
+            ];
+
+        const trendPrev =
+            trendEMA[
+                i - TREND_EMA - 1
+            ];
+
+        // ==============================================
+        // RSI
+        // ==============================================
+
+        const currentRSI =
+            rsi[
+                i - RSI_LENGTH
+            ];
+
+        // ==============================================
+        // VOLUME
+        // ==============================================
+
+        const avgVolume =
+            volumes
+                .slice(i - 25, i)
+                .reduce(
+                    (a, b) => a + b,
+                    0
+                ) / 25;
+
+        const highVolume =
+            candle.volume >
+            avgVolume *
+            VOLUME_MULTIPLIER;
+
+        // ==============================================
+        // TREND
+        // ==============================================
+
+        const bullishTrend =
+            price > trend;
+
+        const bearishTrend =
+            price < trend;
+
+        const bullishSlope =
+            trend > trendPrev;
+
+        const bearishSlope =
+            trend < trendPrev;
+
+        // ==============================================
+        // EMA STRUCTURE
+        // ==============================================
+
+        const emaBullish =
+            fast > slow;
+
+        const emaBearish =
+            fast < slow;
+
+        // ==============================================
+        // EMA REJECTION
+        // ==============================================
+
+        const rejectionBuy =
+            candle.low <= fast &&
+            candle.close > fast;
+
+        const rejectionSell =
+            candle.high >= fast &&
+            candle.close < fast;
+
+        // ==============================================
+        // BUY SIGNAL
+        // ==============================================
+
+        const buySignal =
+            bullishTrend &&
+            bullishSlope &&
+            emaBullish &&
+            rejectionBuy &&
+            highVolume &&
+            currentRSI > 52;
+
+        // ==============================================
+        // SELL SIGNAL
+        // ==============================================
+
+        const sellSignal =
+            bearishTrend &&
+            bearishSlope &&
+            emaBearish &&
+            rejectionSell &&
+            highVolume &&
+            currentRSI < 48;
+
+        // ==============================================
+        // SKIP
+        // ==============================================
+
+        if (
+            !buySignal &&
+            !sellSignal
+        ) {
+            continue;
+        }
+
+        // ==============================================
+        // ENTRY
+        // ==============================================
+
+        const entry =
+            candles[i + 1].open;
+
+        let side;
+
+        let sl;
+
+        let tp;
+
+        // ==============================================
+        // BUY
+        // ==============================================
+
+        if (buySignal) {
+
+            side = "BUY";
+
+            sl =
+                candle.low *
+                (
+                    1 -
+                    STOP_BUFFER / 100
+                );
+
+            const risk =
+                entry - sl;
+
+            tp =
+                entry +
+                (
+                    risk * RR
+                );
+        }
+
+        // ==============================================
+        // SELL
+        // ==============================================
+
+        else {
+
+            side = "SELL";
+
+            sl =
+                candle.high *
+                (
+                    1 +
+                    STOP_BUFFER / 100
+                );
+
+            const risk =
+                sl - entry;
+
+            tp =
+                entry -
+                (
+                    risk * RR
+                );
+        }
+
+        // ==============================================
+        // POINTS
+        // ==============================================
+
+        const slPoints =
+            Math.abs(entry - sl);
+
+        const tpPoints =
+            Math.abs(tp - entry);
+
+        // ==============================================
+        // RESULT
+        // ==============================================
+
+        let result = "OPEN";
+
+        // ==============================================
+        // CHECK NEXT CANDLES
+        // ==============================================
+
+        for (
+            let j = i + 1;
+            j < i + 20;
+            j++
+        ) {
+
+            const next =
+                candles[j];
+
+            // ==========================================
+            // BUY
+            // ==========================================
+
+            if (side === "BUY") {
+
+                if (
+                    next.low <= sl
+                ) {
+
+                    result = "LOSS";
+
+                    balance -= 100;
+
+                    grossLoss += 100;
+
+                    losses++;
+
+                    break;
+                }
+
+                if (
+                    next.high >= tp
+                ) {
+
+                    result = "WIN";
+
+                    balance += 150;
+
+                    grossProfit += 150;
+
+                    wins++;
+
+                    break;
+                }
+            }
+
+            // ==========================================
+            // SELL
+            // ==========================================
+
+            else {
+
+                if (
+                    next.high >= sl
+                ) {
+
+                    result = "LOSS";
+
+                    balance -= 100;
+
+                    grossLoss += 100;
+
+                    losses++;
+
+                    break;
+                }
+
+                if (
+                    next.low <= tp
+                ) {
+
+                    result = "WIN";
+
+                    balance += 150;
+
+                    grossProfit += 150;
+
+                    wins++;
+
+                    break;
+                }
+            }
+        }
+
+        // ==============================================
+        // DRAWDOWN
+        // ==============================================
+
+        peakBalance =
+            Math.max(
+                peakBalance,
+                balance
+            );
+
+        const drawdown =
+            (
+                (
+                    peakBalance -
+                    balance
+                ) / peakBalance
+            ) * 100;
+
+        maxDrawdown =
+            Math.max(
+                maxDrawdown,
+                drawdown
+            );
+
+        // ==============================================
+        // STORE TRADE
+        // ==============================================
+
+        trades.push({
+
+            Date:
+                new Date(
+                    candle.time
+                ).toLocaleString(),
+
+            Side: side,
+
+            Entry:
+                entry.toFixed(2),
+
+            SL:
+                sl.toFixed(2),
+
+            TP:
+                tp.toFixed(2),
+
+            "SL Points":
+                slPoints.toFixed(2),
+
+            "TP Points":
+                tpPoints.toFixed(2),
+
+            RSI:
+                currentRSI.toFixed(2),
+
+            Result: result,
+
+            Balance:
+                balance.toFixed(2)
+        });
+    }
+
+    // ==================================================
+    // FINAL STATS
+    // ==================================================
+
+    const totalTrades =
+        wins + losses;
+
+    const winRate =
+        (
+            wins / totalTrades
+        ) * 100;
+
+    const profitFactor =
+        grossProfit / grossLoss;
+
+    const avgSL =
+        trades.reduce(
+            (a, b) =>
+                a +
+                Number(
+                    b["SL Points"]
+                ),
+            0
+        ) / trades.length;
+
+    const avgTP =
+        trades.reduce(
+            (a, b) =>
+                a +
+                Number(
+                    b["TP Points"]
+                ),
+            0
+        ) / trades.length;
+
+    // ==================================================
+    // RESULTS
+    // ==================================================
+
+    console.log(
+        "\n========== BACKTEST RESULTS ==========\n"
+    );
+
+    console.table(
+        trades.slice(-20)
+    );
+
+    console.log(
+        `Symbol: ${SYMBOL}`
+    );
+
+    console.log(
+        `Timeframe: ${TIMEFRAME}`
+    );
+
+    console.log(
+        `Total Trades: ${totalTrades}`
+    );
+
+    console.log(
+        `Wins: ${wins}`
+    );
+
+    console.log(
+        `Losses: ${losses}`
+    );
+
+    console.log(
+        `Win Rate: ${winRate.toFixed(2)}%`
+    );
+
+    console.log(
+        `Average SL Points: ${avgSL.toFixed(2)}`
+    );
+
+    console.log(
+        `Average TP Points: ${avgTP.toFixed(2)}`
+    );
+
+    console.log(
+        `Profit Factor: ${profitFactor.toFixed(2)}`
+    );
+
+    console.log(
+        `Max Drawdown: ${maxDrawdown.toFixed(2)}%`
+    );
+
+    console.log(
+        `Final Balance: ${balance.toFixed(2)}`
+    );
 }
 
 // ======================================================
 // START
 // ======================================================
 
-console.log("Trendline Breakout Bot Started...");
-
-checkTrendlineBreakout();
-
-setInterval(checkTrendlineBreakout, CHECK_INTERVAL);
+backtest();

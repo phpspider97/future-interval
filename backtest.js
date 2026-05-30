@@ -1,630 +1,392 @@
 require("dotenv").config();
 
-const ccxt = require("ccxt");
-const ti = require("technicalindicators");
+const axios = require("axios");
 
 // ======================================================
-// EXCHANGE
+// SETTINGS
 // ======================================================
 
-const exchange = new ccxt.delta({
-    enableRateLimit: true,
-    options: {
-        defaultType: "future"
-    },
-    urls: {
-        api: {
-            public: "https://api.india.delta.exchange",
-            private: "https://api.india.delta.exchange",
+const SYMBOL = "PAXGUSD";
+
+const RANGE_POINTS = 5;
+const CLOSE_POINTS = 15;
+
+const BASE_LOT = 1;
+const MARTINGALE_MULTIPLIER = 2;
+
+const DAYS = 30;
+
+// ======================================================
+// FETCH DELTA 1M CANDLES
+// ======================================================
+
+async function getCandles() {
+
+    const end =
+        Math.floor(Date.now() / 1000);
+
+    const start =
+        end - (DAYS * 24 * 60 * 60);
+
+    const response = await axios.get(
+        "https://api.india.delta.exchange/v2/history/candles",
+        {
+            params: {
+                symbol: SYMBOL,
+                resolution: "1m",
+                start,
+                end
+            }
         }
-    }
-});
+    );
 
-// ======================================================
-// CONFIG
-// ======================================================
-
-const SYMBOL = "BTCUSD";
-
-const TIMEFRAME = "15m";
-
-const FAST_EMA = 21;
-const SLOW_EMA = 50;
-const TREND_EMA = 200;
-
-const RSI_LENGTH = 14;
-
-const RR = 1
-
-const STOP_BUFFER = 0.15;
-
-const VOLUME_MULTIPLIER = 1.2;
-
-const INITIAL_BALANCE = 1000;
-
-// ======================================================
-// FETCH HISTORICAL DATA
-// ======================================================
-
-async function fetchAllCandles() {
-
-    let since =
-        Date.now() - (30 * 24 * 60 * 60 * 1000);
-
-    let allCandles = [];
-
-    while (true) {
-
-        const candles =
-            await exchange.fetchOHLCV(
-                SYMBOL,
-                TIMEFRAME,
-                since,
-                1000
-            );
-
-        if (!candles.length) {
-            break;
-        }
-
-        allCandles.push(...candles);
-
-        since =
-            candles[candles.length - 1][0] + 1;
-
-        console.log(
-            `Fetched Candles: ${allCandles.length}`
-        );
-
-        await new Promise(
-            r => setTimeout(r, 500)
-        );
-
-        if (candles.length < 1000) {
-            break;
-        }
-    }
-
-    return allCandles.map(c => ({
-        time: c[0],
-        open: c[1],
-        high: c[2],
-        low: c[3],
-        close: c[4],
-        volume: c[5]
-    }));
+    return response.data.result || [];
 }
 
 // ======================================================
 // BACKTEST
 // ======================================================
 
-async function backtest() {
+async function runBacktest() {
 
-    const candles =
-        await fetchAllCandles();
+    const candles = await getCandles();
 
-    console.log(
-        `Total Candles: ${candles.length}`
-    );
+    if (!candles.length) {
 
-    const closes =
-        candles.map(c => c.close);
+        console.log("No candle data");
+        return;
+    }
 
-    const volumes =
-        candles.map(c => c.volume);
+    let basePrice =
+        Math.round(Number(candles[0].close));
 
-    // ==================================================
-    // INDICATORS
-    // ==================================================
+    let tradeHistory = [];
 
-    const fastEMA =
-        ti.EMA.calculate({
-            period: FAST_EMA,
-            values: closes
-        });
+    let activeTrades = [];
 
-    const slowEMA =
-        ti.EMA.calculate({
-            period: SLOW_EMA,
-            values: closes
-        });
+    let nextExpectedSide = null;
 
-    const trendEMA =
-        ti.EMA.calculate({
-            period: TREND_EMA,
-            values: closes
-        });
+    let currentLot = BASE_LOT;
 
-    const rsi =
-        ti.RSI.calculate({
-            period: RSI_LENGTH,
-            values: closes
-        });
+    let totalPnL = 0;
+
+    let totalOrders = 0;
+
+    let totalSessions = 0;
+
+    let winningSessions = 0;
+
+    let losingSessions = 0;
+
+    let maxTradeReachedCount = 0;
+
+    const sessionStats = [];
+
+    const flipDistribution = {};
 
     // ==================================================
-    // OFFSET
+    // LOOP
     // ==================================================
 
-    const offset = TREND_EMA + 5;
+    for (const candle of candles) {
 
-    // ==================================================
-    // STATS
-    // ==================================================
+        const high =
+            Math.round(Number(candle.high));
 
-    let balance = INITIAL_BALANCE;
+        const low =
+            Math.round(Number(candle.low));
 
-    let peakBalance = INITIAL_BALANCE;
+        const close =
+            Math.round(Number(candle.close));
 
-    let maxDrawdown = 0;
+        const upperBreak =
+            basePrice + RANGE_POINTS;
 
-    let wins = 0;
+        const lowerBreak =
+            basePrice - RANGE_POINTS;
 
-    let losses = 0;
+        const upperTarget =
+            basePrice + CLOSE_POINTS;
 
-    let grossProfit = 0;
+        const lowerTarget =
+            basePrice - CLOSE_POINTS;
 
-    let grossLoss = 0;
+        // ==========================================
+        // FIRST ENTRY
+        // ==========================================
 
-    const trades = [];
+        if (!nextExpectedSide) {
 
-    // ==================================================
-    // MAIN LOOP
-    // ==================================================
+            if (high >= upperBreak) {
 
-    for (
-        let i = offset;
-        i < candles.length - 20;
-        i++
-    ) {
+                activeTrades.push({
+                    side: "buy",
+                    entry: upperBreak,
+                    lot: currentLot
+                });
 
-        const candle =
-            candles[i];
+                tradeHistory.push({
+                    side: "buy",
+                    lot: currentLot
+                });
 
-        const price =
-            candle.close;
+                totalOrders++;
 
-        // ==============================================
-        // EMA VALUES
-        // ==============================================
+                nextExpectedSide = "sell";
 
-        const fast =
-            fastEMA[
-                i - FAST_EMA
-            ];
+                if (tradeHistory.length < 5) {
+                    currentLot *= MARTINGALE_MULTIPLIER;
+                }
+            }
 
-        const slow =
-            slowEMA[
-                i - SLOW_EMA
-            ];
+            else if (low <= lowerBreak) {
 
-        const trend =
-            trendEMA[
-                i - TREND_EMA
-            ];
+                activeTrades.push({
+                    side: "sell",
+                    entry: lowerBreak,
+                    lot: currentLot
+                });
 
-        const trendPrev =
-            trendEMA[
-                i - TREND_EMA - 1
-            ];
+                tradeHistory.push({
+                    side: "sell",
+                    lot: currentLot
+                });
 
-        // ==============================================
-        // RSI
-        // ==============================================
+                totalOrders++;
 
-        const currentRSI =
-            rsi[
-                i - RSI_LENGTH
-            ];
+                nextExpectedSide = "buy";
 
-        // ==============================================
-        // VOLUME
-        // ==============================================
-
-        const avgVolume =
-            volumes
-                .slice(i - 25, i)
-                .reduce(
-                    (a, b) => a + b,
-                    0
-                ) / 25;
-
-        const highVolume =
-            candle.volume >
-            avgVolume *
-            VOLUME_MULTIPLIER;
-
-        // ==============================================
-        // TREND
-        // ==============================================
-
-        const bullishTrend =
-            price > trend;
-
-        const bearishTrend =
-            price < trend;
-
-        const bullishSlope =
-            trend > trendPrev;
-
-        const bearishSlope =
-            trend < trendPrev;
-
-        // ==============================================
-        // EMA STRUCTURE
-        // ==============================================
-
-        const emaBullish =
-            fast > slow;
-
-        const emaBearish =
-            fast < slow;
-
-        // ==============================================
-        // EMA REJECTION
-        // ==============================================
-
-        const rejectionBuy =
-            candle.low <= fast &&
-            candle.close > fast;
-
-        const rejectionSell =
-            candle.high >= fast &&
-            candle.close < fast;
-
-        // ==============================================
-        // BUY SIGNAL
-        // ==============================================
-
-        const buySignal =
-            bullishTrend &&
-            bullishSlope &&
-            emaBullish &&
-            rejectionBuy &&
-            highVolume &&
-            currentRSI > 52;
-
-        // ==============================================
-        // SELL SIGNAL
-        // ==============================================
-
-        const sellSignal =
-            bearishTrend &&
-            bearishSlope &&
-            emaBearish &&
-            rejectionSell &&
-            highVolume &&
-            currentRSI < 48;
-
-        // ==============================================
-        // SKIP
-        // ==============================================
-
-        if (
-            !buySignal &&
-            !sellSignal
-        ) {
-            continue;
+                if (tradeHistory.length < 5) {
+                    currentLot *= MARTINGALE_MULTIPLIER;
+                }
+            }
         }
 
-        // ==============================================
-        // ENTRY
-        // ==============================================
-
-        const entry =
-            candles[i + 1].open;
-
-        let side;
-
-        let sl;
-
-        let tp;
-
-        // ==============================================
-        // BUY
-        // ==============================================
-
-        if (buySignal) {
-
-            side = "BUY";
-
-            sl =
-                candle.low *
-                (
-                    1 -
-                    STOP_BUFFER / 100
-                );
-
-            const risk =
-                entry - sl;
-
-            tp =
-                entry +
-                (
-                    risk * RR
-                );
-        }
-
-        // ==============================================
-        // SELL
-        // ==============================================
+        // ==========================================
+        // FLIP ENTRIES
+        // ==========================================
 
         else {
 
-            side = "SELL";
+            if (
+                nextExpectedSide === "sell" &&
+                low <= lowerBreak
+            ) {
 
-            sl =
-                candle.high *
-                (
-                    1 +
-                    STOP_BUFFER / 100
-                );
+                activeTrades.push({
+                    side: "sell",
+                    entry: lowerBreak,
+                    lot: currentLot
+                });
 
-            const risk =
-                sl - entry;
+                tradeHistory.push({
+                    side: "sell",
+                    lot: currentLot
+                });
 
-            tp =
-                entry -
-                (
-                    risk * RR
-                );
-        }
+                totalOrders++;
 
-        // ==============================================
-        // POINTS
-        // ==============================================
+                nextExpectedSide = "buy";
 
-        const slPoints =
-            Math.abs(entry - sl);
-
-        const tpPoints =
-            Math.abs(tp - entry);
-
-        // ==============================================
-        // RESULT
-        // ==============================================
-
-        let result = "OPEN";
-
-        // ==============================================
-        // CHECK NEXT CANDLES
-        // ==============================================
-
-        for (
-            let j = i + 1;
-            j < i + 20;
-            j++
-        ) {
-
-            const next =
-                candles[j];
-
-            // ==========================================
-            // BUY
-            // ==========================================
-
-            if (side === "BUY") {
-
-                if (
-                    next.low <= sl
-                ) {
-
-                    result = "LOSS";
-
-                    balance -= 100;
-
-                    grossLoss += 100;
-
-                    losses++;
-
-                    break;
-                }
-
-                if (
-                    next.high >= tp
-                ) {
-
-                    result = "WIN";
-
-                    balance += 150;
-
-                    grossProfit += 150;
-
-                    wins++;
-
-                    break;
+                if (tradeHistory.length < 5) {
+                    currentLot *= MARTINGALE_MULTIPLIER;
                 }
             }
 
-            // ==========================================
-            // SELL
-            // ==========================================
+            else if (
+                nextExpectedSide === "buy" &&
+                high >= upperBreak
+            ) {
+
+                activeTrades.push({
+                    side: "buy",
+                    entry: upperBreak,
+                    lot: currentLot
+                });
+
+                tradeHistory.push({
+                    side: "buy",
+                    lot: currentLot
+                });
+
+                totalOrders++;
+
+                nextExpectedSide = "sell";
+
+                if (tradeHistory.length < 5) {
+                    currentLot *= MARTINGALE_MULTIPLIER;
+                }
+            }
+        }
+
+        // ==========================================
+        // MAX TRADE REACHED
+        // ==========================================
+
+        if (
+            tradeHistory.length === 5
+        ) {
+            maxTradeReachedCount++;
+        }
+
+        // ==========================================
+        // TARGET CHECK
+        // ==========================================
+
+        let exitPrice = null;
+
+        if (high >= upperTarget) {
+            exitPrice = upperTarget;
+        }
+
+        else if (low <= lowerTarget) {
+            exitPrice = lowerTarget;
+        }
+
+        if (exitPrice === null) continue;
+
+        // ==========================================
+        // SESSION PNL
+        // ==========================================
+
+        let sessionPnL = 0;
+
+        for (const trade of activeTrades) {
+
+            if (trade.side === "buy") {
+
+                sessionPnL +=
+                    (exitPrice - trade.entry) *
+                    trade.lot;
+            }
 
             else {
 
-                if (
-                    next.high >= sl
-                ) {
-
-                    result = "LOSS";
-
-                    balance -= 100;
-
-                    grossLoss += 100;
-
-                    losses++;
-
-                    break;
-                }
-
-                if (
-                    next.low <= tp
-                ) {
-
-                    result = "WIN";
-
-                    balance += 150;
-
-                    grossProfit += 150;
-
-                    wins++;
-
-                    break;
-                }
+                sessionPnL +=
+                    (trade.entry - exitPrice) *
+                    trade.lot;
             }
         }
 
-        // ==============================================
-        // DRAWDOWN
-        // ==============================================
+        // ==========================================
+        // FLIP COUNT
+        // ==========================================
 
-        peakBalance =
-            Math.max(
-                peakBalance,
-                balance
-            );
+        let flips = 0;
 
-        const drawdown =
-            (
-                (
-                    peakBalance -
-                    balance
-                ) / peakBalance
-            ) * 100;
+        for (
+            let i = 1;
+            i < tradeHistory.length;
+            i++
+        ) {
 
-        maxDrawdown =
-            Math.max(
-                maxDrawdown,
-                drawdown
-            );
+            if (
+                tradeHistory[i].side !==
+                tradeHistory[i - 1].side
+            ) {
+                flips++;
+            }
+        }
 
-        // ==============================================
-        // STORE TRADE
-        // ==============================================
+        flipDistribution[flips] =
+            (flipDistribution[flips] || 0) + 1;
 
-        trades.push({
+        totalPnL += sessionPnL;
 
-            Date:
-                new Date(
-                    candle.time
-                ).toLocaleString(),
+        totalSessions++;
 
-            Side: side,
+        if (sessionPnL > 0) {
+            winningSessions++;
+        } else {
+            losingSessions++;
+        }
 
-            Entry:
-                entry.toFixed(2),
-
-            SL:
-                sl.toFixed(2),
-
-            TP:
-                tp.toFixed(2),
-
-            "SL Points":
-                slPoints.toFixed(2),
-
-            "TP Points":
-                tpPoints.toFixed(2),
-
-            RSI:
-                currentRSI.toFixed(2),
-
-            Result: result,
-
-            Balance:
-                balance.toFixed(2)
+        sessionStats.push({
+            SESSION: totalSessions,
+            ORDERS: tradeHistory.length,
+            FLIPS: flips,
+            PNL: sessionPnL.toFixed(2)
         });
+
+        // ==========================================
+        // RESET SESSION
+        // ==========================================
+
+        basePrice = close;
+
+        tradeHistory = [];
+
+        activeTrades = [];
+
+        nextExpectedSide = null;
+
+        currentLot = BASE_LOT;
     }
 
     // ==================================================
-    // FINAL STATS
+    // SUMMARY
     // ==================================================
 
-    const totalTrades =
-        wins + losses;
+    console.log("\n==============================");
+    console.log("BACKTEST SUMMARY");
+    console.log("==============================");
 
-    const winRate =
-        (
-            wins / totalTrades
-        ) * 100;
+    console.table([{
+        DAYS,
 
-    const profitFactor =
-        grossProfit / grossLoss;
+        TOTAL_SESSIONS:
+            totalSessions,
 
-    const avgSL =
-        trades.reduce(
-            (a, b) =>
-                a +
-                Number(
-                    b["SL Points"]
-                ),
-            0
-        ) / trades.length;
+        TOTAL_ORDERS:
+            totalOrders,
 
-    const avgTP =
-        trades.reduce(
-            (a, b) =>
-                a +
-                Number(
-                    b["TP Points"]
-                ),
-            0
-        ) / trades.length;
+        AVG_ORDERS_PER_SESSION:
+            totalSessions
+                ? (
+                    totalOrders /
+                    totalSessions
+                ).toFixed(2)
+                : 0,
 
-    // ==================================================
-    // RESULTS
-    // ==================================================
+        WINNING_SESSIONS:
+            winningSessions,
 
-    console.log(
-        "\n========== BACKTEST RESULTS ==========\n"
-    );
+        LOSING_SESSIONS:
+            losingSessions,
+
+        WIN_RATE:
+            totalSessions
+                ? (
+                    winningSessions /
+                    totalSessions *
+                    100
+                ).toFixed(2) + "%"
+                : "0%",
+
+        MAX_TRADE_REACHED:
+            maxTradeReachedCount,
+
+        TOTAL_PNL:
+            totalPnL.toFixed(2)
+    }]);
+
+    console.log("\n==============================");
+    console.log("SESSION DETAILS");
+    console.log("==============================");
+
+    console.table(sessionStats);
+
+    console.log("\n==============================");
+    console.log("FLIP DISTRIBUTION");
+    console.log("==============================");
 
     console.table(
-        trades.slice(-20)
-    );
-
-    console.log(
-        `Symbol: ${SYMBOL}`
-    );
-
-    console.log(
-        `Timeframe: ${TIMEFRAME}`
-    );
-
-    console.log(
-        `Total Trades: ${totalTrades}`
-    );
-
-    console.log(
-        `Wins: ${wins}`
-    );
-
-    console.log(
-        `Losses: ${losses}`
-    );
-
-    console.log(
-        `Win Rate: ${winRate.toFixed(2)}%`
-    );
-
-    console.log(
-        `Average SL Points: ${avgSL.toFixed(2)}`
-    );
-
-    console.log(
-        `Average TP Points: ${avgTP.toFixed(2)}`
-    );
-
-    console.log(
-        `Profit Factor: ${profitFactor.toFixed(2)}`
-    );
-
-    console.log(
-        `Max Drawdown: ${maxDrawdown.toFixed(2)}%`
-    );
-
-    console.log(
-        `Final Balance: ${balance.toFixed(2)}`
+        Object.entries(
+            flipDistribution
+        ).map(([flip, count]) => ({
+            FLIPS: Number(flip),
+            SESSIONS: count
+        }))
     );
 }
 
@@ -632,4 +394,4 @@ async function backtest() {
 // START
 // ======================================================
 
-backtest();
+runBacktest().catch(console.error);

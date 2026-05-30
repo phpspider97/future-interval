@@ -18,13 +18,15 @@ async function getPublicIP() {
 }
 getPublicIP()
 
-const discount_price_detector = require('./bot-test/discount-price-detector')
 const intervalManager = require('./bot-test/intervalManager')
-const ema_pullback = require('./bot-test/ema_pullback')
+const discount_price_detector = require('./bot-test/discount-price-detector')
+const goldRange = require('./bot-test/gold-range')
+//const ema_pullback = require('./bot-test/ema_pullback')
 
 console.log(`%====================================================================%`);
 intervalManager.start('!=== DISCOUNT PRICE DETECTOR ===!',discount_price_detector.run,60000); 
-intervalManager.start('!=== EMA PULL BACK DETECTOR ===!',ema_pullback.run,15000); 
+intervalManager.start('!=== GOLD RANGE ===!',goldRange.run,1000); 
+//intervalManager.start('!=== EMA PULL BACK DETECTOR ===!',ema_pullback.run,15000); 
 console.log(`%====================================================================%`);
 return true
 

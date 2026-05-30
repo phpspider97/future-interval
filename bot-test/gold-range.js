@@ -138,8 +138,8 @@ async function initialize() {
     maxTradeReached = false;
     maxTradeAlertSent = false;
 
-    console.log("\nNEW SESSION STARTED");
-    console.log("BASE:", basePrice);
+    //console.log("\nNEW SESSION STARTED");
+    //console.log("BASE:", basePrice);
 
     await sendTelegramMessage(`
 🚀 <b>NEW SESSION STARTED</b>

@@ -11,11 +11,8 @@ const crypto = require("crypto");
 const API_KEY = process.env.G_GRID_WEB_KEY;
 const API_SECRET = process.env.G_GRID_WEB_SECRET;
 
-const TELEGRAM_BOT =
-    process.env.TELEGRAM_EMA_PULLBACK_TOKEN;
-
-const CHAT_ID =
-    process.env.TELEGRAM_EMA_PULLBACK_CHAT_ID;
+const TELEGRAM_BOT = process.env.TELEGRAM_EMA_PULLBACK_TOKEN;
+const CHAT_ID = process.env.TELEGRAM_EMA_PULLBACK_CHAT_ID;
 
 // ======================================================
 // TELEGRAM
@@ -232,11 +229,11 @@ async function openTrade(side, price) {
             lot: tradeLot
         });
 
-        console.table([{
-            SIDE: side,
-            ENTRY: price,
-            LOT: tradeLot
-        }]);
+        // console.table([{
+        //     SIDE: side,
+        //     ENTRY: price,
+        //     LOT: tradeLot
+        // }]);
 
         nextExpectedSide =
             side === "buy" ? "sell" : "buy";
@@ -335,13 +332,13 @@ async function run() {
 
         console.clear();
 
-        console.table([{
-            PRICE: price,
-            BASE: basePrice,
-            TRADES: tradeHistory.length,
-            LOT: currentLot,
-            MAX: maxTradeReached ? "YES" : "NO"
-        }]);
+        // console.table([{
+        //     PRICE: price,
+        //     BASE: basePrice,
+        //     TRADES: tradeHistory.length,
+        //     LOT: currentLot,
+        //     MAX: maxTradeReached ? "YES" : "NO"
+        // }]);
 
         // MAX LIMIT
         if (maxTradeReached) {

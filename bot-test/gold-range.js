@@ -80,8 +80,8 @@ const exchange = new ccxt.delta({
 
 const SYMBOL = "PAXGUSD";
 
-const RANGE_POINTS = 5;
-const CLOSE_POINTS = 15;
+const RANGE_POINTS = 2;
+const CLOSE_POINTS = 6;
 
 const BASE_LOT = 1;
 const MARTINGALE_MULTIPLIER = 2;

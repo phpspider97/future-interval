@@ -8,8 +8,8 @@ const axios = require("axios");
 
 const SYMBOL = "PAXGUSD";
 
-const RANGE_POINTS = 5;
-const CLOSE_POINTS = 15;
+const RANGE_POINTS = 3;
+const CLOSE_POINTS = 9;
 
 const BASE_LOT = 1;
 const MARTINGALE_MULTIPLIER = 2;

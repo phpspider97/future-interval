@@ -86,6 +86,10 @@ const CLOSE_POINTS = 6;
 const BASE_LOT = 1;
 const MARTINGALE_MULTIPLIER = 2;
 const MAX_TRADE_LENGTH  =   5;
+const ADDITIONAL_FEES_COVER_LOT = 3
+
+let isClosingSession = false;
+let isInitializing = false;
 
 // ======================================================
 // STATE
@@ -127,21 +131,24 @@ async function getPrice() {
 
 async function initialize() {
 
-    basePrice = await getPrice();
+    if (isInitializing) return;
 
-    activeTrade = null;
-    tradeHistory = [];
-    nextExpectedSide = null;
-    currentLot = BASE_LOT;
-    lastSignal = null;
+    isInitializing = true;
 
-    maxTradeReached = false;
-    maxTradeAlertSent = false;
+    try {
 
-    //console.log("\nNEW SESSION STARTED");
-    //console.log("BASE:", basePrice);
+        basePrice = await getPrice();
 
-    await sendTelegramMessage(`
+        activeTrade = null;
+        tradeHistory = [];
+        nextExpectedSide = null;
+        currentLot = BASE_LOT;
+        lastSignal = null;
+
+        maxTradeReached = false;
+        maxTradeAlertSent = false;
+
+        await sendTelegramMessage(`
 🚀 <b>NEW SESSION STARTED</b>
 
 📊 ${SYMBOL}
@@ -154,8 +161,14 @@ async function initialize() {
 🎯 TP Down: ${basePrice - CLOSE_POINTS}
 
 📦 Base Lot: ${BASE_LOT}
-🧠 Max Trades: 5
+🧠 Max Trades: ${MAX_TRADE_LENGTH}
 `);
+    }
+
+    finally {
+
+        isInitializing = false;
+    }
 }
 
 // ======================================================
@@ -168,7 +181,10 @@ async function executeTrade(side, lot) {
 
         let updated_lot = 1
         if(lot != 1){
-            updated_lot = lot + (lot/2)
+            updated_lot = lot + (lot/2) + ADDITIONAL_FEES_COVER_LOT
+        }
+        if(maxTradeReached){
+            updated_lot = lot * 2 + ADDITIONAL_FEES_COVER_LOT
         }
 
         const order =
@@ -282,17 +298,58 @@ async function openTrade(side, price) {
 
 async function closeAll(price) {
 
+    if (isClosingSession) return;
+
+    isClosingSession = true;
+
     try {
 
-        for (const t of tradeHistory) {
+        console.log("CLOSING ALL POSITIONS");
+
+        const positions =
+            await exchange.fetchPositions([SYMBOL]);
+
+        const position =
+            positions.find(
+                p =>
+                    Math.abs(
+                        Number(
+                            p.contracts ||
+                            p.info?.size ||
+                            0
+                        )
+                    ) > 0
+            );
+
+        if (position) {
+
+            const rawSize =
+                Number(
+                    position.contracts ||
+                    position.info?.size ||
+                    0
+                );
+
+            const size =
+                Math.abs(rawSize);
 
             const closeSide =
-                t.side === "buy" ? "sell" : "buy";
+                rawSize > 0
+                    ? "sell"
+                    : "buy";
 
             await exchange.createMarketOrder(
                 SYMBOL,
                 closeSide,
-                t.lot
+                size,
+                undefined,
+                {
+                    reduce_only: true
+                }
+            );
+
+            console.log(
+                `Closed ${size} contracts`
             );
         }
 
@@ -302,13 +359,24 @@ async function closeAll(price) {
 📊 ${SYMBOL}
 📦 Trades: ${tradeHistory.length}
 💰 Exit: ${price}
+
+🕒 ${new Date().toLocaleString("en-IN", {
+            timeZone: "Asia/Kolkata"
+        })}
 `);
 
         await initialize();
 
     } catch (err) {
 
-        await sendErrorAlert(err, "closeAll");
+        await sendErrorAlert(
+            err,
+            "closeAll"
+        );
+
+    } finally {
+
+        isClosingSession = false;
     }
 }
 

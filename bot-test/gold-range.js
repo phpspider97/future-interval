@@ -413,17 +413,17 @@ async function run() {
 
         console.clear();
 
-        console.table([{
-            PRICE: price,
-            BASE: basePrice,
-            upperBreak: upperBreak,
-            lowerBreak: lowerBreak,
-            upperClose: upperClose,
-            lowerClose: lowerClose,
-            TRADES: tradeHistory.length,
-            LOT: currentLot,
-            MAX: maxTradeReached ? "YES" : "NO"
-        }]);
+        // console.table([{
+        //     PRICE: price,
+        //     BASE: basePrice,
+        //     upperBreak: upperBreak,
+        //     lowerBreak: lowerBreak,
+        //     upperClose: upperClose,
+        //     lowerClose: lowerClose,
+        //     TRADES: tradeHistory.length,
+        //     LOT: currentLot,
+        //     MAX: maxTradeReached ? "YES" : "NO"
+        // }]);
 
         // MAX LIMIT
         if (maxTradeReached) {

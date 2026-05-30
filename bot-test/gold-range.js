@@ -10,13 +10,36 @@ const crypto = require("crypto");
 
 const API_KEY = process.env.G_GRID_WEB_KEY;
 const API_SECRET = process.env.G_GRID_WEB_SECRET;
+const API_URL = process.env.API_URL;
 
-const TELEGRAM_BOT = process.env.TELEGRAM_EMA_PULLBACK_TOKEN;
-const CHAT_ID = process.env.TELEGRAM_EMA_PULLBACK_CHAT_ID;
+// const API_KEY = process.env.TEST_API_KEY;
+// const API_SECRET = process.env.TEST_API_SECRET;
+// const API_URL = process.env.TEST_API_URL;
+
+// ======================================================
+// SETTINGS
+// ======================================================
+
+const SYMBOL = "PAXGUSD";
+
+const RANGE_POINTS = 3;
+const CLOSE_POINTS = 9;
+
+const BASE_LOT = 1;
+const MARTINGALE_MULTIPLIER = 2;
+const MAX_TRADE_LENGTH  =   5;
+const ADDITIONAL_FEES_COVER_LOT = 0
+
+let isClosingSession = false;
+let isInitializing = false;
+
 
 // ======================================================
 // TELEGRAM
 // ======================================================
+
+const TELEGRAM_BOT = process.env.TELEGRAM_EMA_PULLBACK_TOKEN;
+const CHAT_ID = process.env.TELEGRAM_EMA_PULLBACK_CHAT_ID;
 
 async function sendTelegramMessage(message) {
 
@@ -68,28 +91,11 @@ const exchange = new ccxt.delta({
     },
     urls: {
         api: {
-            public: "https://api.india.delta.exchange",
-            private: "https://api.india.delta.exchange",
+            public: API_URL,
+            private: API_URL,
         }
     }
 });
-
-// ======================================================
-// SETTINGS
-// ======================================================
-
-const SYMBOL = "PAXGUSD";
-
-const RANGE_POINTS = 2;
-const CLOSE_POINTS = 6;
-
-const BASE_LOT = 1;
-const MARTINGALE_MULTIPLIER = 2;
-const MAX_TRADE_LENGTH  =   5;
-const ADDITIONAL_FEES_COVER_LOT = 3
-
-let isClosingSession = false;
-let isInitializing = false;
 
 // ======================================================
 // STATE
@@ -122,7 +128,7 @@ async function getPrice() {
     const ticker =
         await exchange.fetchTicker(SYMBOL);
 
-    return Math.round(ticker.last);
+    return Math.round(ticker.markPrice);
 }
 
 // ======================================================
@@ -179,19 +185,22 @@ async function executeTrade(side, lot) {
 
     try {
 
-        let updated_lot = 1
-        if(lot != 1){
-            updated_lot = lot + (lot/2) + ADDITIONAL_FEES_COVER_LOT
-        }
-        if(maxTradeReached){
-            updated_lot = lot * 2 + ADDITIONAL_FEES_COVER_LOT
-        }
+        // let updated_lot = lot
+        // if(lot != 1){
+        //     updated_lot = lot + ADDITIONAL_FEES_COVER_LOT
+        // }
+        // if(lot != 1){
+        //     updated_lot = lot + ADDITIONAL_FEES_COVER_LOT
+        // }
+        // if(maxTradeReached){
+        //     updated_lot = lot + ADDITIONAL_FEES_COVER_LOT
+        // }
 
         const order =
             await exchange.createMarketOrder(
                 SYMBOL,
                 side,
-                updated_lot
+                lot
             );
 
         await sendTelegramMessage(`
@@ -200,7 +209,6 @@ async function executeTrade(side, lot) {
 📊 ${SYMBOL}
 📈 ${side.toUpperCase()}
 📦 Lot: ${lot}
-📦 Update Lot: ${updated_lot}
 `);
 
         return order;
@@ -216,6 +224,10 @@ async function executeTrade(side, lot) {
 // ======================================================
 // OPEN TRADE (FIXED LOT SNAPSHOT + ALERT FIX)
 // ======================================================
+
+async function closeActiveTrade() {
+    closeAll(0,false)
+}
 
 async function openTrade(side, price) {
 
@@ -296,7 +308,7 @@ async function openTrade(side, price) {
 // CLOSE ALL
 // ======================================================
 
-async function closeAll(price) {
+async function closeAll(price,inner=true) {
 
     if (isClosingSession) return;
 
@@ -352,7 +364,7 @@ async function closeAll(price) {
                 `Closed ${size} contracts`
             );
         }
-
+if(inner){
         await sendTelegramMessage(`
 🔄 <b>SESSION CLOSED</b>
 
@@ -366,6 +378,7 @@ async function closeAll(price) {
 `);
 
         await initialize();
+}
 
     } catch (err) {
 
@@ -400,13 +413,17 @@ async function run() {
 
         console.clear();
 
-        // console.table([{
-        //     PRICE: price,
-        //     BASE: basePrice,
-        //     TRADES: tradeHistory.length,
-        //     LOT: currentLot,
-        //     MAX: maxTradeReached ? "YES" : "NO"
-        // }]);
+        console.table([{
+            PRICE: price,
+            BASE: basePrice,
+            upperBreak: upperBreak,
+            lowerBreak: lowerBreak,
+            upperClose: upperClose,
+            lowerClose: lowerClose,
+            TRADES: tradeHistory.length,
+            LOT: currentLot,
+            MAX: maxTradeReached ? "YES" : "NO"
+        }]);
 
         // MAX LIMIT
         if (maxTradeReached) {
@@ -440,6 +457,7 @@ async function run() {
                 nextExpectedSide === "sell" &&
                 price <= lowerBreak
             ) {
+                await closeActiveTrade();
                 await openTrade("sell", price);
             }
 
@@ -447,6 +465,7 @@ async function run() {
                 nextExpectedSide === "buy" &&
                 price >= upperBreak
             ) {
+                await closeActiveTrade();
                 await openTrade("buy", price);
             }
         }

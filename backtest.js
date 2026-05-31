@@ -9,7 +9,7 @@ const axios = require("axios");
 const SYMBOL = "PAXGUSD";
 
 const RANGE_POINTS = 2;
-const CLOSE_POINTS = 10;
+const CLOSE_POINTS = 8;
 
 const BASE_LOT = 1;
 const MARTINGALE_MULTIPLIER = 2;
@@ -134,7 +134,7 @@ async function runBacktest() {
 
                 nextExpectedSide = "sell";
 
-                if (tradeHistory.length < 5) {
+                if (tradeHistory.length < 8) {
                     currentLot *= MARTINGALE_MULTIPLIER;
                 }
             }
@@ -156,7 +156,7 @@ async function runBacktest() {
 
                 nextExpectedSide = "buy";
 
-                if (tradeHistory.length < 5) {
+                if (tradeHistory.length < 8) {
                     currentLot *= MARTINGALE_MULTIPLIER;
                 }
             }
@@ -188,7 +188,7 @@ async function runBacktest() {
 
                 nextExpectedSide = "buy";
 
-                if (tradeHistory.length < 5) {
+                if (tradeHistory.length < 8) {
                     currentLot *= MARTINGALE_MULTIPLIER;
                 }
             }
@@ -213,7 +213,7 @@ async function runBacktest() {
 
                 nextExpectedSide = "sell";
 
-                if (tradeHistory.length < 5) {
+                if (tradeHistory.length < 8) {
                     currentLot *= MARTINGALE_MULTIPLIER;
                 }
             }

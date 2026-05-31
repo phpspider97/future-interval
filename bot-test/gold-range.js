@@ -10,6 +10,7 @@ const crypto = require("crypto");
 
 const API_KEY = process.env.G_GRID_WEB_KEY;
 const API_SECRET = process.env.G_GRID_WEB_SECRET;
+const USER_ID = process.env.G_GRID_WEB_USER_ID;
 const API_URL = process.env.API_URL;
 
 // const API_KEY = process.env.TEST_API_KEY;
@@ -23,7 +24,7 @@ const API_URL = process.env.API_URL;
 const SYMBOL = "PAXGUSD";
 
 const RANGE_POINTS = 2;
-const CLOSE_POINTS = 10;
+const CLOSE_POINTS = 8;
 
 const BASE_LOT = 1;
 const MARTINGALE_MULTIPLIER = 2;
@@ -128,7 +129,7 @@ async function getPrice() {
     const ticker =
         await exchange.fetchTicker(SYMBOL);
 
-    return Math.round(ticker.markPrice);
+    return ticker.last;
 }
 
 // ======================================================
@@ -308,62 +309,34 @@ async function openTrade(side, price) {
 // CLOSE ALL
 // ======================================================
 
+async function generateEncryptSignature(signaturePayload) { 
+    return crypto.createHmac("sha256", API_SECRET).update(signaturePayload).digest("hex");
+}
+
 async function closeAll(price,inner=true) {
-
     if (isClosingSession) return;
-
     isClosingSession = true;
-
     try {
-
         console.log("CLOSING ALL POSITIONS");
 
-        const positions =
-            await exchange.fetchPositions([SYMBOL]);
+        const timestamp = Math.floor(Date.now() / 1000);
+        const bodyParams = {
+            close_all_portfolio: true,
+            close_all_isolated: true,
+            user_id: USER_ID,
+        }; 
+        const signaturePayload = `POST${timestamp}/v2/positions/close_all${JSON.stringify(bodyParams)}`;
+        const signature = await generateEncryptSignature(signaturePayload);
 
-        const position =
-            positions.find(
-                p =>
-                    Math.abs(
-                        Number(
-                            p.contracts ||
-                            p.info?.size ||
-                            0
-                        )
-                    ) > 0
-            );
+        const headers = {
+            "api-key": API_KEY,
+            "signature": signature,
+            "timestamp": timestamp,
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+        }; 
+        await axios.post(`${API_URL}/v2/positions/close_all`, bodyParams, { headers });
 
-        if (position) {
-
-            const rawSize =
-                Number(
-                    position.contracts ||
-                    position.info?.size ||
-                    0
-                );
-
-            const size =
-                Math.abs(rawSize);
-
-            const closeSide =
-                rawSize > 0
-                    ? "sell"
-                    : "buy";
-
-            await exchange.createMarketOrder(
-                SYMBOL,
-                closeSide,
-                size,
-                undefined,
-                {
-                    reduce_only: true
-                }
-            );
-
-            console.log(
-                `Closed ${size} contracts`
-            );
-        }
 if(inner){
         await sendTelegramMessage(`
 🔄 <b>SESSION CLOSED</b>
@@ -398,7 +371,8 @@ if(inner){
 // ======================================================
 
 async function run() {
-
+    // const d = new Date();
+    // console.log(d.getSeconds())
     try {
 
         if (!basePrice) await initialize();
@@ -413,17 +387,17 @@ async function run() {
 
         console.clear();
 
-        // console.table([{
-        //     PRICE: price,
-        //     BASE: basePrice,
-        //     upperBreak: upperBreak,
-        //     lowerBreak: lowerBreak,
-        //     upperClose: upperClose,
-        //     lowerClose: lowerClose,
-        //     TRADES: tradeHistory.length,
-        //     LOT: currentLot,
-        //     MAX: maxTradeReached ? "YES" : "NO"
-        // }]);
+        console.table([{
+            PRICE: price,
+            BASE: basePrice,
+            upperBreak: upperBreak,
+            lowerBreak: lowerBreak,
+            upperClose: upperClose,
+            lowerClose: lowerClose,
+            TRADES: tradeHistory.length,
+            LOT: currentLot,
+            MAX: maxTradeReached ? "YES" : "NO"
+        }]);
 
         // MAX LIMIT
         if (maxTradeReached) {

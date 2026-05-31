@@ -22,8 +22,8 @@ const API_URL = process.env.API_URL;
 
 const SYMBOL = "PAXGUSD";
 
-const RANGE_POINTS = 3;
-const CLOSE_POINTS = 9;
+const RANGE_POINTS = 2;
+const CLOSE_POINTS = 10;
 
 const BASE_LOT = 1;
 const MARTINGALE_MULTIPLIER = 2;

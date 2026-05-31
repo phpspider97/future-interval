@@ -44,14 +44,14 @@ const exchange = new ccxt.delta({
 
 const SYMBOLS = [
     "BTCUSD",
-    //"ETHUSD",
-    //"PAXGUSD"
+    "ETHUSD",
+    "PAXGUSD"
 ];
 
-const TIMEFRAME = "15m";
+const TIMEFRAME = "5m";
 
-const FAST_EMA = 21;
-const SLOW_EMA = 50;
+const FAST_EMA = 9;
+const SLOW_EMA = 21;
 const TREND_EMA = 200;
 
 const RSI_LENGTH = 14;
@@ -59,7 +59,7 @@ const RSI_LENGTH = 14;
 const VOLUME_MULTIPLIER = 1.2;
 
 const STOP_BUFFER_PERCENT = 0.15;
-const RISK_REWARD = 1;
+const RISK_REWARD = 2;
 
 const CHECK_INTERVAL = 30000;
 
@@ -396,28 +396,28 @@ async function processSymbol(symbol) {
             // CREATE ORDER
             // ==============================================
 
-            await createOrder("buy",symbol,signal.currentPrice,stopLoss.toFixed(2),takeProfit.toFixed(2),ORDER_SIZES[symbol]);
+            //await createOrder("buy",symbol,signal.currentPrice,stopLoss.toFixed(2),takeProfit.toFixed(2),ORDER_SIZES[symbol]);
 
             // ==============================================
             // TELEGRAM
             // ==============================================
 
-//             await sendTelegramMessage(
+            await sendTelegramMessage(
 
-// `🚀 <b>BUY ORDER EXECUTED</b>
+`🚀 <b>BUY ORDER EXECUTED</b>
 
-// 📈 Symbol: ${symbol}
+📈 Symbol: ${symbol}
 
-// 💰 Entry: ${signal.currentPrice}
+💰 Entry: ${signal.currentPrice}
 
-// 🛑 SL: ${stopLoss.toFixed(2)}
+🛑 SL: ${stopLoss.toFixed(2)}
 
-// 🎯 TP: ${takeProfit.toFixed(2)}
+🎯 TP: ${takeProfit.toFixed(2)}
 
-// 📊 RSI: ${signal.rsiCurrent.toFixed(2)}
+📊 RSI: ${signal.rsiCurrent.toFixed(2)}
 
-// 🕒 TF: ${TIMEFRAME}`
-//             );
+🕒 TF: ${TIMEFRAME}`
+            );
         }
 
         // ==================================================
@@ -454,28 +454,28 @@ async function processSymbol(symbol) {
             // CREATE ORDER
             // ==============================================
 
-            await createOrder("sell",symbol,signal.currentPrice,stopLoss.toFixed(2),takeProfit.toFixed(2),ORDER_SIZES[symbol])
+           // await createOrder("sell",symbol,signal.currentPrice,stopLoss.toFixed(2),takeProfit.toFixed(2),ORDER_SIZES[symbol])
 
             // ==============================================
             // TELEGRAM
             // ==============================================
 
-//             await sendTelegramMessage(
+            await sendTelegramMessage(
 
-// `🔻 <b>SELL ORDER EXECUTED</b>
+`🔻 <b>SELL ORDER EXECUTED</b>
 
-// 📈 Symbol: ${symbol}
+📈 Symbol: ${symbol}
 
-// 💰 Entry: ${signal.currentPrice}
+💰 Entry: ${signal.currentPrice}
 
-// 🛑 SL: ${stopLoss.toFixed(2)}
+🛑 SL: ${stopLoss.toFixed(2)}
 
-// 🎯 TP: ${takeProfit.toFixed(2)}
+🎯 TP: ${takeProfit.toFixed(2)}
 
-// 📊 RSI: ${signal.rsiCurrent.toFixed(2)}
+📊 RSI: ${signal.rsiCurrent.toFixed(2)}
 
-// 🕒 TF: ${TIMEFRAME}`
-//             );
+🕒 TF: ${TIMEFRAME}`
+            );
 
 
         }
@@ -624,7 +624,7 @@ async function createOrder(signal,symbol,price,sl,tp2,qty=1){
             bracket_stop_loss_limit_price: sl,
             bracket_stop_loss_price: sl,
         };
-        console.log('bodyParams :',bodyParams)
+        //console.log('bodyParams :',bodyParams)
         const signaturePayload =
             `POST${timestamp}/v2/orders${JSON.stringify(bodyParams)}`;
 

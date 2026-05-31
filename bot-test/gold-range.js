@@ -39,8 +39,8 @@ let isInitializing = false;
 // TELEGRAM
 // ======================================================
 
-const TELEGRAM_BOT = process.env.TELEGRAM_EMA_PULLBACK_TOKEN;
-const CHAT_ID = process.env.TELEGRAM_EMA_PULLBACK_CHAT_ID;
+const TELEGRAM_BOT = process.env.TELEGRAM_WHALE_DETECTOR_TOKEN;
+const CHAT_ID = process.env.TELEGRAM_WHALE_DETECTOR_CHAT_ID;
 
 async function sendTelegramMessage(message) {
 
@@ -227,7 +227,7 @@ async function executeTrade(side, lot) {
 // ======================================================
 
 async function closeActiveTrade() {
-    closeAll(0,false)
+    await closeAll(0,false)
 }
 
 async function openTrade(side, price) {

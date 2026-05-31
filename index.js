@@ -21,12 +21,14 @@ getPublicIP()
 const intervalManager = require('./bot-test/intervalManager')
 const discount_price_detector = require('./bot-test/discount-price-detector')
 const goldRange = require('./bot-test/gold-range')
-//const ema_pullback = require('./bot-test/ema_pullback')
+const ema_pullback = require('./bot-test/ema_pullback')
+const balace_detector = require('./bot-test/balance')
 
 console.log(`%====================================================================%`);
 intervalManager.start('!=== DISCOUNT PRICE DETECTOR ===!',discount_price_detector.run,60000); 
 intervalManager.start('!=== GOLD RANGE ===!',goldRange.run,1000); 
-//intervalManager.start('!=== EMA PULL BACK DETECTOR ===!',ema_pullback.run,15000); 
+intervalManager.start('!=== EMA PULL BACK DETECTOR ===!',ema_pullback.run,15000); 
+intervalManager.start('!=== BALANCE DETECTOR ===!',balace_detector.run,60*60000); 
 console.log(`%====================================================================%`);
 return true
 

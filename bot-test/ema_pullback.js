@@ -357,7 +357,7 @@ async function processSymbol(symbol) {
         // ==================================================
         // POSITION CHECK
         // ==================================================
-
+ 
         const hasPosition =  await hasOpenPosition(symbol);
         //console.log('hasPosition : ', hasPosition)
         //const hasPosition = false;

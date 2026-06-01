@@ -28,7 +28,7 @@ const CLOSE_POINTS = 8;
 
 const BASE_LOT = 1;
 const MARTINGALE_MULTIPLIER = 2;
-const MAX_TRADE_LENGTH  =   5;
+const MAX_TRADE_LENGTH  =   7;
 const ADDITIONAL_FEES_COVER_LOT = 0
 
 let isClosingSession = false;
@@ -362,7 +362,9 @@ if(inner){
 
     } finally {
 
-        isClosingSession = false;
+        setTimeout(() => {
+            isClosingSession = false;
+        }, 5000);
     }
 }
 
